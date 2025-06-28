@@ -23,6 +23,8 @@ import os
 import time
 import shutil
 import random
+import pytesseract
+from PIL import Image
 
 from schedule_extractor_utils import (
     check_for_running_chrome_processes,
@@ -329,6 +331,15 @@ def move_mouse_to_canvas(driver, canvas_element, x, y):
     """, canvas_element, x, y)
     print(f"Mouse pointer moved to ({x}, {y}) on canvas.")
 
+def save_canvas_snapshot(canvas_element, step_name):
+    """
+    Save a screenshot of the canvas element for OCR processing.
+    """
+    snapshot_path = os.path.join(SCREENSHOT_OUTPUT_DIR, f"{step_name}_canvas.png")
+    canvas_element.screenshot(snapshot_path)
+    print(f"Canvas snapshot saved: {snapshot_path}")
+    return snapshot_path
+
 def navigate_to_schedule(driver):
     flutter_view_element = WebDriverWait(driver, 30).until(
         EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
@@ -354,18 +365,35 @@ def navigate_to_schedule(driver):
     interactive_snapshot_and_exit(driver, flutter_view_element, step_name="minimize_two")
     time.sleep(2)
 
-    # Assuming these prior clicks succeeded, we are now looking at the exposed dom view
-    # Scroll up (negative deltaY) to reach the top of the day of the month view
+    # Scroll and snapshot pipeline
     print("Scrolling up to the top of the day of the month view...")
-    scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=-120, steps=10, delay=0.2, x=1200, y=300)
-    time.sleep(10)
-
-    # Now scroll down (positive deltaY) to reach the bottom of the day of the month view
-    print("Scrolling down to the bottom of the day of the month view...")
-    scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=120, steps=20, delay=0.2)
+    scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=-120, steps=10, delay=0.2, x=1200, y=350)
     time.sleep(2)
 
-    interactive_snapshot_and_exit(driver, flutter_view_element, step_name="after_dom_scroll")
+    print("Beginning snapshot and scroll loop...")
+    num_scrolls = 10  # Adjust as needed for full coverage
+
+    for i in range(num_scrolls):
+        snap_name = f"dom_scroll_{i+1}"
+        save_canvas_snapshot(flutter_view_element, snap_name)
+        if i < num_scrolls - 1:
+            scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=120, steps=1, delay=0.5, x=1200, y=350)
+            time.sleep(1)
+
+    # OCR all snapshots and write results to file
+    output_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "all_ocr_results.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        for i in range(1, num_scrolls + 1):
+            img_path = os.path.join(SCREENSHOT_OUTPUT_DIR, f"dom_scroll_{i}_canvas.png")
+            if not os.path.exists(img_path):
+                print(f"File not found: {img_path}")
+                continue
+            img = Image.open(img_path)
+            text = pytesseract.image_to_string(img)
+            print(f"--- OCR Result {i} ---\n{text}\n{'-'*40}")
+            f.write(f"--- OCR Result {i} ---\n{text}\n{'-'*40}\n")
+
+    print(f"OCR results saved to {output_path}")
 
     return flutter_view_element
 

@@ -1,12 +1,29 @@
+# =============================================================================
 # schedule_extractor.py
-# This is the main script to run the schedule extraction process.
-# Script Version: 0.0.80 # Corrected initial swipe up parameters
+# -----------------------------------------------------------------------------
+# Main script to automate extraction of schedule data from a web app using
+# Selenium and OCR. Handles browser automation, login, navigation, screenshot
+# capture, and text extraction.
+#
+# Author: Martin Baer
+# Version: 0.0.80
+# Created: 2024-06-26
+# License: MIT
+# -----------------------------------------------------------------------------
+# Usage:
+#   python schedule_extractor.py
+#
+# Notes:
+#   - Requires ChromeDriver and compatible Chrome version.
+#   - Configuration is managed in schedule_extractor_config.py.
+#   - Utility functions are in schedule_extractor_utils.py.
+# =============================================================================
 
 import os
 import time
-import shutil # For deleting directories
+import shutil
+import random
 
-# Import functions from schedule_extractor_utils
 from schedule_extractor_utils import (
     check_for_running_chrome_processes,
     initialize_undetected_chrome_driver,
@@ -14,65 +31,47 @@ from schedule_extractor_utils import (
     perform_minimization_sequence,
     drag_element_to_scroll,
     capture_and_ocr_segment,
-    perform_swipe_on_element # Explicitly import perform_swipe_on_element as it's used directly here
+    perform_mouse_click_on_element # <-- Replace swipe with click
 )
 
-# Import configuration variables directly
 from schedule_extractor_config import (
-    WEB_APP_URL, SCREENSHOT_OUTPUT_DIR, SCREENSHOT_BASE_NAME, CHROME_USER_DATA_DIR,
+    WEB_APP_URL, SCREENSHOT_OUTPUT_DIR, CHROME_USER_DATA_DIR, CHROMEDRIVER_PATH,
     SCHEDULE_CLICK_X_OFFSET, SCHEDULE_CLICK_Y_OFFSET, FLUTTER_VIEW_LOCATOR,
     MAX_DRAG_ATTEMPTS, DRAG_AMOUNT_Y_PIXELS, DRAG_START_X_OFFSET,
     DRAG_START_Y_OFFSET_RELATIVE_TO_ELEMENT_HEIGHT,
-    END_OF_SCROLL_INDICATOR_LOCATOR
+    END_OF_SCROLL_INDICATOR_LOCATOR,
+    SCROLL_FLUTTER_VIEW_AND_CAPTURE
 )
-
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 
+SCRIPT_VERSION = "0.0.80"
 
-# --- Configuration (Local to Main Script for direct access) ---
-# This SCRIPT_VERSION is defined here to ensure it's always available for printing.
-# It should be kept consistent with the version in schedule_extractor_config.py for true version tracking.
-SCRIPT_VERSION = "0.0.80" # Updated version for corrected initial swipe up
-
-
-# --- Main Extraction Function ---
-def extract_text_from_flutter_view():
-    """
-    Automates Browse to a web app by launching Chrome, logging in,
-    taking screenshots of the Flutter view (with simulated scrolling),
-    and extracting text using OCR.
-    """
-    print("Automating browser launch and login sequence...")
-    print(f"Script Version: {SCRIPT_VERSION}") # Prints the script version
-
-    # --- Check for running Chrome processes before proceeding ---
-    if check_for_running_chrome_processes():
-        return # Exit the script if Chrome is already running
-
-    # --- CLEANUP OLD DATA (Screenshots & Profile) ---
-    print(f"Cleaning up old Chrome user data directory for fresh start: {CHROME_USER_DATA_DIR}")
+def cleanup_environment():
+    """Remove old Chrome user data and screenshots for a fresh run."""
+    print(f"Cleaning up old Chrome user data directory: {CHROME_USER_DATA_DIR}")
     if os.path.exists(CHROME_USER_DATA_DIR):
         try:
             shutil.rmtree(CHROME_USER_DATA_DIR)
-            print("Old user data directory removed successfully.")
+            print("Old user data directory removed.")
         except Exception as e:
-            print(f"WARNING: Error removing old user data directory: {e}. This might be OK if Chrome is already closed. Proceeding.")
+            print(f"WARNING: Could not remove user data directory: {e}")
 
-    # --- ENHANCED SCREENSHOT CLEANUP ---
-    print(f"Cleaning up all old screenshots in the output directory: {SCREENSHOT_OUTPUT_DIR}")
+    print(f"Cleaning up old screenshots in: {SCREENSHOT_OUTPUT_DIR}")
     if os.path.exists(SCREENSHOT_OUTPUT_DIR):
         try:
             shutil.rmtree(SCREENSHOT_OUTPUT_DIR)
-            print("Old screenshot directory removed successfully.")
+            print("Old screenshot directory removed.")
         except Exception as e:
-            print(f"WARNING: Error removing old screenshot directory: {e}. Proceeding but folder might not be clean: {e}")
-    
+            print(f"WARNING: Could not remove screenshot directory: {e}")
     os.makedirs(SCREENSHOT_OUTPUT_DIR, exist_ok=True)
     print(f"Ensured screenshot output directory exists: {SCREENSHOT_OUTPUT_DIR}")
-    # --- END CLEANUP ---
 
+def launch_browser():
+    """Launch Chrome with required options."""
     chrome_options = Options()
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
@@ -100,206 +99,294 @@ def extract_text_from_flutter_view():
     chrome_options.add_argument("--enable-automation")
     chrome_options.add_argument("--disable-setuid-sandbox")
     chrome_options.add_argument("--disable-notifications")
-
     service = Service(CHROMEDRIVER_PATH)
-    driver = None
+    driver = initialize_undetected_chrome_driver()
+    return driver
 
-    try: # OUTER TRY BLOCK START
-        driver = initialize_undetected_chrome_driver()
-        
-        print(f"Navigating to {WEB_APP_URL}...")
-        driver.get(WEB_APP_URL)
+def wait_for_login(driver):
+    """Wait for user to log in and solve any CAPTCHA."""
+    print("\n--- ATTENTION REQUIRED ---")
+    print("Please log in and solve any CAPTCHA in the Chrome window.")
+    input("Press ENTER here after you are logged in and see the dashboard...")
+    try:
+        WebDriverWait(driver, 60).until(
+            EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
+        )
+        print("Login and CAPTCHA complete. Proceeding with automation.")
+    except Exception as e:
+        print("Timeout waiting for dashboard after login. Please check the browser window.")
+        driver.quit()
+        exit(1)
 
-        print("\n--- ATTENTION REQUIRED ---")
-        print(f"Waiting for the initial 'Are you human?' challenge to resolve and redirect to the login page (up to 90 seconds)...")
-        print("If the 'Are you human?' test does not resolve automatically within the first 10-15 seconds,")
-        print("PLEASE MANUALLY SOLVE IT IN THE CHROME WINDOW and observe if the login page then appears.")
-
+def interactive_find_click_coordinates(driver, flutter_view_element, num_clicks=5):
+    """
+    Guide the user through a process to find and record click coordinates.
+    After each click, a screenshot is saved so the user can use Paint or another tool
+    to determine the next coordinates.
+    """
+    print("\n--- INTERACTIVE CLICK COORDINATE DISCOVERY ---")
+    click_coords = []
+    for i in range(num_clicks):
+        print(f"\nStep {i+1} of {num_clicks}:")
+        x = input(f"Enter X offset for click #{i+1} (pixels, relative to schedule area): ")
+        y = input(f"Enter Y offset for click #{i+1} (pixels, relative to schedule area): ")
         try:
-            WebDriverWait(driver, 90).until(
-                EC.url_contains("identity.homedepot.com/as/authorization.oauth2")
-            )
-            print(f"Successfully redirected to login page: {driver.current_url}")
-            time.sleep(5) # Small pause after successful redirect
-        except Exception as e:
-            print(f"Timed out waiting for redirect to login page. Current URL: {driver.current_url}")
-            print(f"Error details: {e}")
-            print("Please ensure you manually solved any 'Are you human?' challenges if they appeared.")
-            print("Proceeding with fixed delay to allow for manual intervention if needed.")
-            time.sleep(15) # Extended pause for manual intervention
-            print(f"Current URL after manual intervention (if any): {driver.current_url}")
+            x = int(x)
+            y = int(y)
+        except ValueError:
+            print("Invalid input. Please enter integer values.")
+            continue
 
-        username = input("Please enter your username: ")
-        password = input("Please enter your password: ")
+        perform_mouse_click_on_element(driver, flutter_view_element, x, y)
+        print(f"Clicked at ({x}, {y}). Waiting for UI to update...")
+        time.sleep(2)  # Wait for UI to update
 
-        if not perform_login(driver, username, password):
-            print("Login failed. Exiting script.")
-            driver.quit()
-            return
+        # Take a screenshot after the click
+        snapshot_path = os.path.join(SCREENSHOT_OUTPUT_DIR, f"step_{i+1}_snapshot.png")
+        flutter_view_element.screenshot(snapshot_path)
+        print(f"Snapshot saved: {snapshot_path}")
+        print("Use Paint or another tool to inspect this image and determine the next click coordinates.")
 
-        # --- Dashboard to Schedule Navigation and Minimization Sequence ---
-        flutter_view_element = None # Initialize flutter_view_element here
-        try: # INNER TRY BLOCK START (for app navigation and minimize sequence)
-            # Find the Flutter view element
-            flutter_view_element = WebDriverWait(driver, 30).until(
-                EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
-            )
-            print("Flutter view element confirmed and visible for interaction.")
-            print("Pausing for 15 seconds to allow Flutter dashboard content to render...")
-            time.sleep(15) # Delay for dashboard content to render
-            
-            # Perform a small swipe/drag on the Flutter view element at the specified offset
-            print(f"Attempting small swipe at relative coordinates: ({SCHEDULE_CLICK_X_OFFSET}, {SCHEDULE_CLICK_Y_OFFSET}) to navigate to schedule.")
-            perform_swipe_on_element(
-                driver,
-                flutter_view_element,
-                SCHEDULE_CLICK_X_OFFSET,
-                SCHEDULE_CLICK_Y_OFFSET,
-                5, 0 # Simulate a tap
-            )
-            print("Swipe attempt executed. Assuming successful navigation to schedule view.")
-            time.sleep(5) # Pause for schedule content to start loading
+        click_coords.append((x, y))
 
-            # Take initial snapshot of the SCHEDULE VIEW
-            schedule_initial_snapshot_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "schedule_initial_snapshot.png")
-            flutter_view_element = WebDriverWait(driver, 30).until(EC.presence_of_element_located(FLUTTER_VIEW_LOCATOR))
-            flutter_view_element.screenshot(schedule_initial_snapshot_path)
-            print(f"SUCCESS: Initial snapshot of schedule view saved to: {schedule_initial_snapshot_path}")
-            print("--- Waiting for SCHEDULE VIEW CONTENT to load (fixed 10-second delay) ---")
-            time.sleep(10) # Fixed delay for full schedule content rendering
+    print("\nInteractive click coordinate discovery complete.")
+    print("Collected click coordinates (in order):")
+    for idx, (x, y) in enumerate(click_coords, 1):
+        print(f"  Click #{idx}: ({x}, {y})")
+    print("You can now use these coordinates in your automation sequence.")
 
-            if not perform_minimization_sequence(driver, flutter_view_element):
-                print("Minimization sequence failed. Proceeding with potential issues.")
-                flutter_view_element = None # Indicate that interactions in this phase failed.
-                
-            # --- INITIAL SWIPE UP: Position schedule to the top ---
-            print("\n--- PERFORMING INITIAL SWIPE UP to expose top of schedule ---")
-            try:
-                if flutter_view_element: # Ensure element is still valid
-                    # Swipe upwards visually (drag mouse down) near the middle of the view, with a larger drag amount
-                    drag_element_to_scroll(
-                        driver,
-                        flutter_view_element,
-                        DRAG_AMOUNT_Y_PIXELS, # Use positive Y to scroll content UPWARDS (by dragging mouse DOWN)
-                        flutter_view_element.size['width'] // 2, # Start X at center of element
-                        0.1 # Start Y near top of element (relative to its height)
-                    )
-                    print("    Initial swipe up executed.")
-                    time.sleep(3) # Give time for content to settle
+    return click_coords
 
-                    post_initial_swipe_snapshot_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "post_initial_swipe_up.png")
-                    flutter_view_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located(FLUTTER_VIEW_LOCATOR))
-                    flutter_view_element.screenshot(post_initial_swipe_snapshot_path)
-                    print(f"    Post-initial swipe up snapshot saved to: {post_initial_swipe_snapshot_path}")
-                    print("    *** MANUALLY CHECK THIS SNAPSHOT TO CONFIRM SCHEDULE IS AT THE TOP! ***")
+def interactive_snapshot_and_exit(driver, flutter_view_element, step_name="step"):
+    """
+    Take a snapshot of the current view, save it, and exit the script.
+    The user can then open the image in Paint to determine the next click coordinates.
+    """
+    snapshot_path = os.path.join(SCREENSHOT_OUTPUT_DIR, f"{step_name}_snapshot.png")
+    flutter_view_element.screenshot(snapshot_path)
+    print(f"\nSnapshot saved: {snapshot_path}")
+    #print("Open this image in Paint or another tool to determine the next click coordinates.")
+    #print("Exit the script now, update your code/config with the new coordinates, and rerun when ready.")
+    #driver.quit()
+    #exit(0)
 
-            except Exception as e:
-                print(f"    Error during initial swipe up: {e}")
-                print("    Initial swipe up failed.")
+def perform_mouse_click_on_element(driver, element, x_offset, y_offset):
+    """Clicks at a specific offset within a given element."""
+    from selenium.webdriver.common.action_chains import ActionChains
+    print(f"Attempting to click at offset ({x_offset}, {y_offset}) within element: {element}")
+    actions = ActionChains(driver)
+    actions.move_to_element_with_offset(element, x_offset, y_offset).click().perform()
+    print(f"Mouse click performed at offset ({x_offset}, {y_offset}) within element.")
+
+def js_swipe(driver, element, start_x, start_y, end_x, end_y):
+    driver.execute_script("""
+        const rect = arguments[0].getBoundingClientRect();
+        const startX = rect.left + arguments[1];
+        const startY = rect.top + arguments[2];
+        const endX = rect.left + arguments[3];
+        const endY = rect.top + arguments[4];
+        const dataTransfer = new DataTransfer();
+        arguments[0].dispatchEvent(new PointerEvent('pointerdown', {clientX: startX, clientY: startY, bubbles: true}));
+        arguments[0].dispatchEvent(new PointerEvent('pointermove', {clientX: endX, clientY: endY, bubbles: true}));
+        arguments[0].dispatchEvent(new PointerEvent('pointerup', {clientX: endX, clientY: endY, bubbles: true}));
+    """, element, start_x, start_y, end_x, end_y)
+
+def click_canvas_at(driver, canvas_element, x, y):
+    """
+    Dispatch a pointerdown and pointerup event at (x, y) relative to the top-left of the canvas element.
+    """
+    driver.execute_script("""
+        const canvas = arguments[0];
+        const rect = canvas.getBoundingClientRect();
+        const x = arguments[1];
+        const y = arguments[2];
+        const downEvent = new PointerEvent('pointerdown', {
+            clientX: rect.left + x,
+            clientY: rect.top + y,
+            bubbles: true,
+            pointerType: 'mouse'
+        });
+        const upEvent = new PointerEvent('pointerup', {
+            clientX: rect.left + x,
+            clientY: rect.top + y,
+            bubbles: true,
+            pointerType: 'mouse'
+        });
+        canvas.dispatchEvent(downEvent);
+        canvas.dispatchEvent(upEvent);
+    """, canvas_element, x, y)
+    print(f"Canvas pointerdown/pointerup dispatched at ({x}, {y}) relative to canvas.")
+
+def random_canvas_clicks(driver, canvas_element, num_clicks=10):
+    """
+    Perform a series of pseudo-random clicks on the canvas to test for interaction.
+    """
+    rect = canvas_element.rect
+    width = int(rect['width'])
+    height = int(rect['height'])
+    print(f"Canvas element size: width={width}, height={height}")
+
+    for i in range(num_clicks):
+        x = random.randint(0, width - 1)
+        y = random.randint(0, height - 1)
+        print(f"Random click #{i+1} at ({x}, {y})")
+        click_canvas_at(driver, canvas_element, x, y)
+        time.sleep(1)  # Short pause to observe any effect
+
+def swipe_canvas(driver, canvas_element, start_x, start_y, end_x, end_y, duration_ms=300, steps=10):
+    """
+    Simulate a swipe (drag) gesture on a canvas from (start_x, start_y) to (end_x, end_y).
+    Sends multiple pointermove events to mimic a real swipe.
+    """
+    driver.execute_script("""
+        const canvas = arguments[0];
+        const rect = canvas.getBoundingClientRect();
+        const startX = rect.left + arguments[1];
+        const startY = rect.top + arguments[2];
+        const endX = rect.left + arguments[3];
+        const endY = rect.top + arguments[4];
+        const duration = arguments[5];
+        const steps = arguments[6];
+
+        function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+        async function swipe() {
+            const downEvent = new PointerEvent('pointerdown', {
+                clientX: startX,
+                clientY: startY,
+                bubbles: true,
+                pointerType: 'touch'
+            });
+            canvas.dispatchEvent(downEvent);
+
+            for (let i = 1; i <= steps; i++) {
+                const progress = i / steps;
+                const moveX = startX + (endX - startX) * progress;
+                const moveY = startY + (endY - startY) * progress;
+                const moveEvent = new PointerEvent('pointermove', {
+                    clientX: moveX,
+                    clientY: moveY,
+                    bubbles: true,
+                    pointerType: 'touch'
+                });
+                canvas.dispatchEvent(moveEvent);
+                await sleep(duration / steps);
+            }
+
+            const upEvent = new PointerEvent('pointerup', {
+                clientX: endX,
+                clientY: endY,
+                bubbles: true,
+                pointerType: 'touch'
+            });
+            canvas.dispatchEvent(upEvent);
+        }
+        swipe();
+    """, canvas_element, start_x, start_y, end_x, end_y, duration_ms, steps)
+    print(f"Swipe gesture from ({start_x}, {start_y}) to ({end_x}, {end_y}) dispatched on canvas.")
+
+def scroll_canvas_with_wheel(driver, canvas_element, delta_y, steps=1, delay=0.2, x=1200, y=300):
+    """
+    Simulate mouse wheel scrolling on the canvas at a specific (x, y) coordinate.
+    delta_y: positive for scroll down, negative for scroll up.
+    steps: number of wheel events to send.
+    delay: seconds to wait between events.
+    x, y: coordinates relative to the top-left of the canvas.
+    """
+    for i in range(steps):
+        print(f"top of wheel event loop #{i+1} with deltaY={delta_y} at ({x}, {y})")
+        driver.execute_script("""
+            const canvas = arguments[0];
+            const rect = canvas.getBoundingClientRect();
+            const wheelEvent = new WheelEvent('wheel', {
+                clientX: rect.left + arguments[2],
+                clientY: rect.top + arguments[3],
+                deltaY: arguments[1],
+                bubbles: true
+            });
+            canvas.dispatchEvent(wheelEvent);
+        """, canvas_element, delta_y, x, y)
+        print(f"Dispatched wheel event #{i+1} with deltaY={delta_y} at ({x}, {y})")
+        time.sleep(delay)
+
+def move_mouse_to_canvas(driver, canvas_element, x, y):
+    """
+    Move the mouse pointer to (x, y) relative to the top-left of the canvas element.
+    This does not click, just moves the pointer.
+    """
+    driver.execute_script("""
+        const canvas = arguments[0];
+        const rect = canvas.getBoundingClientRect();
+        const x = arguments[1];
+        const y = arguments[2];
+        const moveEvent = new PointerEvent('pointermove', {
+            clientX: rect.left + x,
+            clientY: rect.top + y,
+            bubbles: true,
+            pointerType: 'mouse'
+        });
+        canvas.dispatchEvent(moveEvent);
+    """, canvas_element, x, y)
+    print(f"Mouse pointer moved to ({x}, {y}) on canvas.")
+
+def navigate_to_schedule(driver):
+    flutter_view_element = WebDriverWait(driver, 30).until(
+        EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
+    )
+    time.sleep(20)
+    print("Waiting 5 seconds before clicking through navigation steps...")
+    interactive_snapshot_and_exit(driver, flutter_view_element, step_name="dashboard")
+    time.sleep(10)
+
+    # Click the schedule tile
+    click_canvas_at(driver, flutter_view_element, 300, 300)
+    time.sleep(2)
+    interactive_snapshot_and_exit(driver, flutter_view_element, step_name="schedule_tile")
+
+    # Minimize first graphic
+    click_canvas_at(driver, flutter_view_element, 1200, 645)
+    time.sleep(2)
+    interactive_snapshot_and_exit(driver, flutter_view_element, step_name="minimize_one")
+
+    # Minimize second graphic
+    click_canvas_at(driver, flutter_view_element, 1200, 300)
+    time.sleep(2)
+    interactive_snapshot_and_exit(driver, flutter_view_element, step_name="minimize_two")
+    time.sleep(2)
+
+    # Assuming these prior clicks succeeded, we are now looking at the exposed dom view
+    # Scroll up (negative deltaY) to reach the top of the day of the month view
+    print("Scrolling up to the top of the day of the month view...")
+    scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=-120, steps=10, delay=0.2, x=1200, y=300)
+    time.sleep(10)
+
+    # Now scroll down (positive deltaY) to reach the bottom of the day of the month view
+    print("Scrolling down to the bottom of the day of the month view...")
+    scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=120, steps=20, delay=0.2)
+    time.sleep(2)
+
+    interactive_snapshot_and_exit(driver, flutter_view_element, step_name="after_dom_scroll")
+
+    return flutter_view_element
 
 
-        except Exception as e: # INNER EXCEPT BLOCK END (for app navigation and minimize sequence)
-            print(f"Error during app navigation or minimization sequence: {e}")
-            print("Please manually verify the current page state and logs.")
-            flutter_view_element = None # If this phase failed, set element to None
-            print("Continuing to main scrolling loop with potential issues...")
+# -- EXECUTION START ---
 
+print(f"--- Schedule Extractor Script (v{SCRIPT_VERSION}) ---")
+cleanup_environment()
+driver = launch_browser()
+driver.get(WEB_APP_URL)
 
-        # --- Main Scrolling and Capture Loop (for schedule content) ---
-        print("\n--- Starting main content scrolling and capture loop ---")
-        if flutter_view_element: # Only proceed if flutter_view_element is valid
-            try: # Ensure flutter_view_element is fresh for the loop
-                flutter_view_element = WebDriverWait(driver, 30).until(
-                    EC.presence_of_element_located(FLUTTER_VIEW_LOCATOR)
-                )
-            except Exception as e:
-                print(f"WARNING: Flutter view element became stale before scrolling loop: {e}")
-                flutter_view_element = None # Cannot proceed with scrolling
+# Step 1: Perform login (manual, so skip or comment out)
+# perform_login(driver)
 
-        all_extracted_text_segments = []
-        unique_lines_seen = set() # Keep track of all unique lines extracted so far
-        drag_attempt_count = 0
-        last_total_unique_lines_count = 0 # To detect if new content was added after a drag
-        initial_content_empty = True
+# Step 2: Wait for login and handle CAPTCHA
+wait_for_login(driver)
 
-        while drag_attempt_count < MAX_DRAG_ATTEMPTS and flutter_view_element:
-            # Check for end-of-scroll indicator *before* taking screenshot/dragging
-            if END_OF_SCROLL_INDICATOR_LOCATOR:
-                try:
-                    WebDriverWait(driver, 5).until(EC.invisibility_of_element_located(END_OF_SCROLL_INDICATOR_LOCATOR))
-                    print(f"End-of-scroll indicator '{END_OF_SCROLL_INDICATOR_LOCATOR}' is invisible. Assuming end of content.")
-                    break # Exit loop if indicator is gone
-                except:
-                    print(f"End-of-scroll indicator '{END_OF_SCROLL_INDICATOR_LOCATOR}' is still visible or not found as invisible. Proceeding.")
-                    pass
+# Step 3: Navigate to schedule and discover click coordinates
+navigate_to_schedule(driver)
 
-            current_extracted_text_lines = capture_and_ocr_segment(driver, flutter_view_element, drag_attempt_count)
-            
-            if current_extracted_text_lines:
-                new_lines_in_this_segment = False
-                for line in current_extracted_text_lines:
-                    if line not in unique_lines_seen:
-                        unique_lines_seen.add(line)
-                        new_lines_in_this_segment = True
-
-                if new_lines_in_this_segment or not all_extracted_text_segments:
-                    all_extracted_text_segments.append("\n".join(current_extracted_text_lines))
-                    initial_content_empty = False
-
-            print(f"OCR performed. Total unique lines found: {len(unique_lines_seen)}")
-
-            # Decide whether to scroll again
-            if SCROLL_FLUTTER_VIEW_AND_CAPTURE and flutter_view_element:
-                if len(unique_lines_seen) == last_total_unique_lines_count and drag_attempt_count > 0:
-                    print("No new unique lines found after drag. Reached end of scrollable content or no more content.")
-                    break
-
-                drag_element_to_scroll(driver, flutter_view_element, DRAG_AMOUNT_Y_PIXELS, DRAG_START_X_OFFSET, DRAG_START_Y_OFFSET_RELATIVE_TO_ELEMENT_HEIGHT)
-                last_total_unique_lines_count = len(unique_lines_seen)
-            else:
-                break
-
-            drag_attempt_count += 1
-            time.sleep(2) # Small delay between drag attempts to allow content to render
-
-        if initial_content_empty and not unique_lines_seen:
-            print("\nWARNING: Initial content OCR was empty and no unique lines were extracted across all attempts.")
-            print("Please check: 1) If the schedule actually loaded in the browser. 2) If CROP_COORDINATES are correct. 3) OCR quality.")
-
-
-        print("\n--- All Extracted Schedule Text (Raw Segments) ---")
-        # Print raw segments as extracted
-        for i, segment_text in enumerate(all_extracted_text_segments):
-            print(f"\n--- Segment {i} Text ---")
-            print(segment_text)
-            print("-------------------------")
-
-        # --- NEW: Save unique lines to a text file for accessibility ---
-        if unique_lines_seen:
-            output_text_filename = os.path.join(SCREENSHOT_OUTPUT_DIR, "extracted_schedule.txt")
-            try:
-                with open(output_text_filename, 'w', encoding='utf-8') as f:
-                    # Sort lines for consistent output, if they are not inherently ordered
-                    for line in sorted(list(unique_lines_seen)):
-                        f.write(line + "\n")
-                print(f"\n--- Extracted schedule saved to: {output_text_filename} ---")
-            except Exception as e:
-                print(f"Error saving extracted text to file: {e}")
-        else:
-            print("No unique schedule text extracted.")
-        print("\n------------------------------------")
-
-
-    except Exception as e: # OUTER EXCEPT BLOCK START (catches overall errors)
-        print(f"An error occurred during web automation. Please ensure Chrome is launched with remote debugging:")
-        print(f"Error details: {e}")
-    finally: # FINALLY BLOCK START (ensures driver quits)
-        # IMPORTANT: Do NOT close the browser if connecting to an external session,
-        # otherwise it will shut down the manually launched Chrome instance.
-        if driver: # Only call quit if driver was successfully initialized
-            driver.quit()
-            print("Chrome browser closed by script.")
-        else:
-            print("Script finished. Chrome browser was not launched or failed to initialize.")
-
-# EOF
+print("\n--- SCRIPT COMPLETED ---")
+print("Review the saved snapshots and update your code/config with the new coordinates.")
+print("Rerun the script when ready to continue with automation.")
+driver.quit()

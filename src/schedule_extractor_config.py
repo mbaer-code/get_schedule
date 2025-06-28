@@ -1,6 +1,19 @@
+# =============================================================================
 # schedule_extractor_config.py
-# This file holds all configuration variables for the schedule extractor script.
-# Config Version: 0.0.20 # Sanitized and explicitly versioned for confirmation
+# -----------------------------------------------------------------------------
+# Configuration file for schedule_extractor.py.
+# Stores constants and settings for browser automation, element locations,
+# and other script parameters used throughout the extraction process.
+#
+# Author: Martin Baer
+# Version: 0.0.80
+# Created: 2024-06-26
+# License: MIT
+# -----------------------------------------------------------------------------
+# Notes:
+#   - Update these values to match your environment and web app structure.
+#   - Used by both the main script and utility functions.
+# =============================================================================
 
 from selenium.webdriver.common.by import By # Imports By for locator definitions
 

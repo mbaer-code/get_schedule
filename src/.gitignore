@@ -1,0 +1,10 @@
+
+# .gitignore file
+
+
+*.pyc
+__pycache__/
+temp/
+*.log
+*.csv
+line

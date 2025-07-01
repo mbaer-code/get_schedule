@@ -24,6 +24,8 @@ import time
 import shutil
 import random
 import pytesseract
+import datetime
+import csv
 from PIL import Image
 
 from schedule_extractor_utils import (
@@ -33,7 +35,8 @@ from schedule_extractor_utils import (
     perform_minimization_sequence,
     drag_element_to_scroll,
     capture_and_ocr_segment,
-    perform_mouse_click_on_element # <-- Replace swipe with click
+    perform_mouse_click_on_element, # <-- Replace swipe with click
+    parse_ocr_csv, COLUMN_NAMES
 )
 
 from schedule_extractor_config import (
@@ -371,13 +374,42 @@ def navigate_to_schedule(driver):
     time.sleep(2)
 
     print("Beginning snapshot and scroll loop...")
-    num_scrolls = 10  # Adjust as needed for full coverage
+    num_scrolls = 21  # Capture 21 day entries
+
+    # Determine the starting day of the week (0=Monday, 6=Sunday)
+    start_day_of_week = datetime.datetime.today().weekday()
 
     for i in range(num_scrolls):
-        snap_name = f"dom_scroll_{i+1}"
+        # 1. Click the button at (x=1200, y=270) before scrolling down
+        print(f"Clicking button at (1200, 270) before scroll {i+1}...")
+        click_canvas_at(driver, flutter_view_element, 1200, 270)
+        time.sleep(1)
+
+        # 2. Take a snapshot of the new view after the click
+        snap_name = f"detail_view_{i+1}"
         save_canvas_snapshot(flutter_view_element, snap_name)
+        print(f"Snapshot taken for detail view {i+1}")
+
+        # 3. Return to the DOM canvas using browser back
+        print("Returning to DOM canvas...")
+        driver.back()
+        time.sleep(2)  # Give time for the view to update
+
+        # 4. Re-locate the canvas element after navigation
+        flutter_view_element = WebDriverWait(driver, 30).until(
+            EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
+        )
+
+        # 5. Scroll down for the next day tile, except after last
         if i < num_scrolls - 1:
+            # Calculate the day of the week for the next tile
+            next_day_of_week = (start_day_of_week + i + 1) % 7
+            print(f"Scrolling down for next day tile (scroll {i+2})...")
             scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=120, steps=1, delay=0.5, x=1200, y=350)
+            # If the next tile is Monday, skip the extra text tile
+            if next_day_of_week == 0:
+                print("Advancing wheel by extra 100 px to skip over text before Monday...")
+                scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=100, steps=1, delay=0.5, x=1200, y=350)
             time.sleep(1)
 
     # OCR all snapshots and write results to file
@@ -394,6 +426,37 @@ def navigate_to_schedule(driver):
             f.write(f"--- OCR Result {i} ---\n{text}\n{'-'*40}\n")
 
     print(f"OCR results saved to {output_path}")
+
+    # Save OCR results to CSV
+    output_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results.csv")
+    with open(output_csv_path, "w", encoding="utf-8", newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["filename", "ocr_text"])  # Header row
+
+        for i in range(1, num_scrolls + 1):
+            img_path = os.path.join(SCREENSHOT_OUTPUT_DIR, f"detail_view_{i}_canvas.png")
+            if not os.path.exists(img_path):
+                print(f"File not found: {img_path}")
+                continue
+            img = Image.open(img_path)
+            text = pytesseract.image_to_string(img)
+            if "Not Scheduled" in text:
+                print(f"Skipping {img_path} (Not Scheduled)")
+                continue
+            # Write filename and OCR text as a row
+            writer.writerow([os.path.basename(img_path), text.strip().replace('\n', ' ')])
+
+    print(f"OCR CSV results saved to {output_csv_path}")
+
+    # After writing ocr_results.csv
+    structured_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results_structured.csv")
+    entries = parse_ocr_csv(output_csv_path)
+    with open(structured_csv_path, "w", encoding="utf-8", newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=COLUMN_NAMES)
+        writer.writeheader()
+        for entry in entries:
+            writer.writerow(entry)
+    print(f"Structured CSV written to {structured_csv_path}")
 
     return flutter_view_element
 

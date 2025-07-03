@@ -27,7 +27,9 @@ from selenium.webdriver.common.by import By # Imports By for locator definitions
 #    If tesseract.exe is not in your system PATH, you must specify its location here.
 
 # Path to your ChromeDriver executable (undetected_chromedriver often finds its own, but can provide if needed)
-CHROMEDRIVER_PATH = r'C:\\Program Files\\Google\Webdrivers\\chromedriver-win64\\chromedriver.exe' # Kept for potential fallback
+#CHROMEDRIVER_PATH = r'C:\\Program Files\\Google\Webdrivers\\chromedriver-win64\\chromedriver.exe' # Kept for potential fallback
+CHROMEDRIVER_PATH = r'..\\chrome\\chromedriver-win64\\chromedriver.exe'
+CHROME_PATH = r'..\\chrome\\chrome-win64\\chrome.exe'
 
 # Path to your Tesseract executable (e.g., 'C:\\Program Files\\TESSERACT-OCR\\tesseract.exe')
 # Using raw string (r'...') to avoid "invalid escape sequence" warnings
@@ -48,7 +50,7 @@ CHROME_USER_DATA_DIR = "C:\\SeleniumChromeProfile"
 # --- Chrome Browser Version for undetected_chromedriver ---
 # IMPORTANT: Replace 0 with YOUR Chrome browser's major version number (e.g., 125, 126).
 # You can find this by typing chrome://version into your Chrome browser's address bar.
-CHROME_MAJOR_VERSION = 137 # <--- IMPORTANT: YOU NEED TO PROVIDE THIS (e.g., 137, based on your previous output)
+CHROME_MAJOR_VERSION = 138 # <--- IMPORTANT: YOU NEED TO PROVIDE THIS 
 
 
 # --- USER CREDENTIALS (for automated login) ---

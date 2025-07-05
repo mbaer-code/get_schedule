@@ -112,9 +112,9 @@ def wait_for_login(driver):
     """Wait for user to log in and solve any CAPTCHA."""
     print("\n--- ATTENTION REQUIRED ---")
     print("Please log in and solve any CAPTCHA in the Chrome window.")
-    input("Press ENTER here after you are logged in and see the dashboard...")
+    input("Press ENTER here after you are logged in and see the dashboard...\n")
     try:
-        WebDriverWait(driver, 60).until(
+        WebDriverWait(driver, 10).until(
             EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
         )
         print("Login and CAPTCHA complete. Proceeding with automation.")
@@ -347,10 +347,10 @@ def navigate_to_schedule(driver):
     flutter_view_element = WebDriverWait(driver, 30).until(
         EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
     )
-    time.sleep(20)
-    print("Waiting 5 seconds before clicking through navigation steps...")
+    #time.sleep(20)
+    #print("Waiting 5 seconds before clicking through navigation steps...")
     interactive_snapshot_and_exit(driver, flutter_view_element, step_name="dashboard")
-    time.sleep(10)
+    #time.sleep(10)
 
     # Click the schedule tile
     click_canvas_at(driver, flutter_view_element, 300, 300)
@@ -358,7 +358,8 @@ def navigate_to_schedule(driver):
     interactive_snapshot_and_exit(driver, flutter_view_element, step_name="schedule_tile")
 
     # Minimize first graphic
-    click_canvas_at(driver, flutter_view_element, 1200, 645)
+    #click_canvas_at(driver, flutter_view_element, 1200, 645)
+    click_canvas_at(driver, flutter_view_element, 1200, 550)
     time.sleep(2)
     interactive_snapshot_and_exit(driver, flutter_view_element, step_name="minimize_one")
 
@@ -371,18 +372,49 @@ def navigate_to_schedule(driver):
     # Scroll and snapshot pipeline
     print("Scrolling up to the top of the day of the month view...")
     scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=-120, steps=10, delay=0.2, x=1200, y=350)
+    interactive_snapshot_and_exit(driver, flutter_view_element, step_name="after_scroll_up")
     time.sleep(2)
 
     print("Beginning snapshot and scroll loop...")
     num_scrolls = 21  # Capture 21 day entries
 
-    # Determine the starting day of the week (0=Monday, 6=Sunday)
-    start_day_of_week = datetime.datetime.today().weekday()
-
     for i in range(num_scrolls):
+        print(f"iter {i} for the scroll loop...")
+
+        # 0. Scroll down past the weekly hours summary
+
+        # jump over the devide
+        print(f"testing for mod == {i % 7}...")
+        if i % 7 == 0:
+
+            print(f"i is mod 7: 0...")
+            snap_name = f"weekly_summary_{i}"
+            save_canvas_snapshot(flutter_view_element, snap_name)
+            
+
+            absy = 195
+
+            if i > 0:
+                #wsdelta = 250
+                #wsdelta = 190
+                wsdelta = 150
+            else:
+                #wsdelta = 200
+                wsdelta = 100
+
+
+            #scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=95, steps=1, delay=1, x=1200, y=350)
+            #scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=95, steps=1, delay=1, x=1200, y=190)
+            scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=wsdelta, steps=1, delay=1, x=1200, y=absy)
+            snap_name = f"after_summary_{i}"
+            save_canvas_snapshot(flutter_view_element, snap_name)
+            print(f"Snapshot taken for detail view {i}")
+            time.sleep(1)
+
         # 1. Click the button at (x=1200, y=270) before scrolling down
-        print(f"Clicking button at (1200, 270) before scroll {i+1}...")
-        click_canvas_at(driver, flutter_view_element, 1200, 270)
+        #print(f"Clicking button at (1200, 270) before scroll {i+1}...")
+        print(f"Clicking button at (1200, {absy}) before scroll {i+1}...")
+        click_canvas_at(driver, flutter_view_element, 1200, absy)
         time.sleep(1)
 
         # 2. Take a snapshot of the new view after the click
@@ -401,16 +433,30 @@ def navigate_to_schedule(driver):
         )
 
         # 5. Scroll down for the next day tile, except after last
-        if i < num_scrolls - 1:
+        #if i < num_scrolls - 1:
+        if i < num_scrolls:
+
             # Calculate the day of the week for the next tile
-            next_day_of_week = (start_day_of_week + i + 1) % 7
-            print(f"Scrolling down for next day tile (scroll {i+2})...")
-            scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=120, steps=1, delay=0.5, x=1200, y=350)
-            # If the next tile is Monday, skip the extra text tile
-            if next_day_of_week == 0:
-                print("Advancing wheel by extra 100 px to skip over text before Monday...")
-                scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=100, steps=1, delay=0.5, x=1200, y=350)
-            time.sleep(1)
+
+           #print(f"\nnext_day_of_week is: ", next_day_of_week )
+           #print(f"Scrolling down for next day tile (scroll {i+2})...\n")
+           #scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=120, steps=1, delay=0.5, x=1200, y=350)
+
+           delta = 114
+
+           #yabs  = 350
+           #yabs  = 210
+           yabs  = 290
+
+           print("Advancing wheel by {delta} px to next tile...")
+           #print(f"Scrolling down for next day tile (scroll {i+2})...\n")
+           scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=delta, steps=1, delay=1, x=1200, y=yabs)
+
+           # If the next tile is Monday, skip the extra text tile
+           #if next_day_of_week == 0:
+           #    print("Advancing wheel by extra 160 px to skip over text before Monday...")
+           #    scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=130, steps=1, delay=1, x=1200, y=350)
+           time.sleep(1)
 
     # OCR all snapshots and write results to file
     output_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "all_ocr_results.txt")

@@ -28,8 +28,10 @@ from selenium.webdriver.common.by import By # Imports By for locator definitions
 
 # Path to your ChromeDriver executable (undetected_chromedriver often finds its own, but can provide if needed)
 #CHROMEDRIVER_PATH = r'C:\\Program Files\\Google\Webdrivers\\chromedriver-win64\\chromedriver.exe' # Kept for potential fallback
-CHROMEDRIVER_PATH = r'..\\chrome\\chromedriver-win64\\chromedriver.exe'
-CHROME_PATH = r'..\\chrome\\chrome-win64\\chrome.exe'
+#CHROMEDRIVER_PATH = r'..\\chrome\\chromedriver-win64\\chromedriver.exe'
+CHROMEDRIVER_PATH = r'..\\google\\chrome\\chromedriver-win64\\chromedriver.exe'
+#CHROME_PATH = r'..\\chrome\\chrome-win64\\chrome.exe'
+CHROME_PATH = r'..\\google\\chrome\\chrome-win64\\chrome.exe'
 
 # Path to your Tesseract executable (e.g., 'C:\\Program Files\\TESSERACT-OCR\\tesseract.exe')
 # Using raw string (r'...') to avoid "invalid escape sequence" warnings

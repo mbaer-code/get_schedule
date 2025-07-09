@@ -462,7 +462,7 @@ def navigate_to_schedule(driver):
     output_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "all_ocr_results.txt")
     with open(output_path, "w", encoding="utf-8") as f:
         for i in range(1, num_scrolls + 1):
-            img_path = os.path.join(SCREENSHOT_OUTPUT_DIR, f"dom_scroll_{i}_canvas.png")
+            img_path = os.path.join(SCREENSHOT_OUTPUT_DIR, f"detail_view_{i}_canvas.png")
             if not os.path.exists(img_path):
                 print(f"File not found: {img_path}")
                 continue

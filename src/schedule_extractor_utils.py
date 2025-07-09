@@ -42,14 +42,12 @@ def check_for_running_chrome_processes():
             pass
     return False
 
-def initialize_undetected_chrome_driver():
-    """Initialize and return an undetected Chrome driver instance."""
+def initialize_undetected_chrome_driver(options=None):
     import undetected_chromedriver as uc
     from schedule_extractor_config import CHROMEDRIVER_PATH
-    options = uc.ChromeOptions()
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--start-maximized")
+    if options is None:
+        options = uc.ChromeOptions()
+        options.add_argument("--start-maximized")
     driver = uc.Chrome(driver_executable_path=CHROMEDRIVER_PATH, options=options)
     return driver
 

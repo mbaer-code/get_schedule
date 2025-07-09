@@ -76,9 +76,11 @@ def cleanup_environment():
     os.makedirs(SCREENSHOT_OUTPUT_DIR, exist_ok=True)
     print(f"Ensured screenshot output directory exists: {SCREENSHOT_OUTPUT_DIR}")
 
-def launch_browser():
+def launch_browser(headless=True):
     """Launch Chrome with required options."""
     chrome_options = Options()
+    if headless:
+        chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--start-maximized")
@@ -106,7 +108,7 @@ def launch_browser():
     chrome_options.add_argument("--disable-setuid-sandbox")
     chrome_options.add_argument("--disable-notifications")
     service = Service(CHROMEDRIVER_PATH)
-    driver = initialize_undetected_chrome_driver()
+    driver = initialize_undetected_chrome_driver(options=chrome_options)
     return driver
 
 def wait_for_login(driver):
@@ -510,13 +512,17 @@ def navigate_to_schedule(driver):
 
 # -- EXECUTION START ---
 
-parser = argparse.ArgumentParser(description="Extract schedule data from web app.")
+parser = argparse.ArgumentParser(
+    description="Extract schedule data from web app.",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter
+)
 parser.add_argument("--manual_login", action="store_true", help="Require manual login instead of using environment variables.")
+parser.add_argument("--enable_browser", action="store_true", help="Show browser window (not headless).")
 args = parser.parse_args()
 
 print(f"--- Schedule Extractor Script (v{SCRIPT_VERSION}) ---")
 cleanup_environment()
-driver = launch_browser()
+driver = launch_browser(headless=not args.enable_browser)
 driver.get(WEB_APP_URL)
 
 if args.manual_login:

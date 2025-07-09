@@ -21,6 +21,7 @@ import re
 import subprocess
 import time
 from datetime import datetime, timedelta
+from selenium.webdriver.common.by import By
 
 def check_for_running_chrome_processes():
     """Check if Chrome is running and prompt the user to close it if so."""
@@ -53,9 +54,20 @@ def initialize_undetected_chrome_driver():
     return driver
 
 def perform_login(driver, username, password):
-    """Stub for login automation if needed in the future."""
-    # This function is not used in the new flow, but kept for compatibility.
-    return True
+    print("Starting perform_login...")
+    try:
+        username_field = driver.find_element(By.ID, "inputUsername")
+        password_field = driver.find_element(By.ID, "inputPassword")
+        username_field.clear()
+        username_field.send_keys(username)
+        password_field.clear()
+        password_field.send_keys(password)
+        # Use the correct login button ID (case-sensitive: buttonSignOn)
+        login_button = driver.find_element(By.ID, "buttonSignOn")
+        login_button.click()
+        print("Login form submitted.")
+    except Exception as e:
+        print(f"Error during perform_login: {e}")
 
 def perform_minimization_sequence(driver):
     """Stub for any UI minimization steps needed after login."""
@@ -166,3 +178,13 @@ def parse_ocr_csv(csv_path):
             }
             results.append(entry)
     return results
+
+try:
+    # ... your main script logic ...
+    driver.quit()
+except Exception as e:
+    print(f"Exception during script execution: {e}")
+    try:
+        driver.quit()
+    except Exception:
+        pass

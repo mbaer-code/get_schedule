@@ -26,6 +26,7 @@ import random
 import pytesseract
 import datetime
 import csv
+import argparse
 from PIL import Image
 
 from schedule_extractor_utils import (
@@ -504,26 +505,57 @@ def navigate_to_schedule(driver):
             writer.writerow(entry)
     print(f"Structured CSV written to {structured_csv_path}")
 
-    return flutter_view_element
+    return output_path, output_csv_path, structured_csv_path  # Return all paths
 
 
 # -- EXECUTION START ---
+
+parser = argparse.ArgumentParser(description="Extract schedule data from web app.")
+parser.add_argument("--manual_login", action="store_true", help="Require manual login instead of using environment variables.")
+args = parser.parse_args()
 
 print(f"--- Schedule Extractor Script (v{SCRIPT_VERSION}) ---")
 cleanup_environment()
 driver = launch_browser()
 driver.get(WEB_APP_URL)
 
-# Step 1: Perform login (manual, so skip or comment out)
-# perform_login(driver)
+if args.manual_login:
+    print("Manual login mode enabled. Please log in and solve any CAPTCHA in the Chrome window.")
+    wait_for_login(driver)
+else:
+    sleep_time =120
+    print(f"Auto login mode enabled. Sleeping for {sleep_time}")
+    time.sleep(sleep_time)  # Wait for turing test to complete
+    USERNAME = os.environ.get("SCHEDULE_USERNAME")
+    PASSWORD = os.environ.get("SCHEDULE_PASSWORD")
+    if USERNAME and PASSWORD:
+        print("Logging in with credentials from environment variables...")
+        perform_login(driver, USERNAME, PASSWORD)
+        # Wait for dashboard after automated login
+        print(f"Waiting for dashboard after login. Sleeping for {sleep_time}")
+        time.sleep(sleep_time)  # Wait for turing test to complete
+        try:
+            WebDriverWait(driver, 30).until(
+                EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
+            )
+            print("Automated login complete. Proceeding with automation.")
+        except Exception as e:
+            print("Automated login failed or dashboard did not load. Please check credentials or site status.")
+            driver.quit()
+            exit(1)
+    else:
+        print("Environment variables SCHEDULE_USERNAME and/or SCHEDULE_PASSWORD not set. Exiting.")
+        driver.quit()
+        exit(1)
 
-# Step 2: Wait for login and handle CAPTCHA
-wait_for_login(driver)
-
-# Step 3: Navigate to schedule and discover click coordinates
-navigate_to_schedule(driver)
+# Step 2: Navigate to schedule and discover click coordinates
+output_path, output_csv_path, structured_csv_path = navigate_to_schedule(driver)
 
 print("\n--- SCRIPT COMPLETED ---")
+print(f"OCR results saved to: {output_path}")
+print(f"OCR CSV results saved to: {output_csv_path}")
+print(f"Structured CSV written to: {structured_csv_path}")
 print("Review the saved snapshots and update your code/config with the new coordinates.")
 print("Rerun the script when ready to continue with automation.")
 driver.quit()
+del driver  # Helps ensure cleanup

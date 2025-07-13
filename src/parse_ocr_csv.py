@@ -80,7 +80,11 @@ def parse_ocr_csv(csv_path):
             results.append(entry)
     return results
 
+
+# -- MAIN --
+
 if __name__ == "__main__":
+
     if not os.path.exists(CSV_PATH):
         print(f"CSV file not found: {CSV_PATH}")
     else:
@@ -92,3 +96,5 @@ if __name__ == "__main__":
             for entry in entries:
                 writer.writerow(entry)
         print("Structured CSV written as ocr_results_structured.csv")
+
+

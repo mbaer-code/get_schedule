@@ -26,9 +26,10 @@ import random
 import pytesseract
 import datetime
 import csv
-import argparse
+#import argparse
 from PIL import Image
 
+# utils imports
 from schedule_extractor_utils import (
     check_for_running_chrome_processes,
     initialize_undetected_chrome_driver,
@@ -36,29 +37,33 @@ from schedule_extractor_utils import (
     perform_minimization_sequence,
     drag_element_to_scroll,
     capture_and_ocr_segment,
-    perform_mouse_click_on_element, # <-- Replace swipe with click
+    perform_mouse_click_on_element,
     parse_ocr_csv, COLUMN_NAMES
 )
 
+# config imports
 from schedule_extractor_config import (
-    WEB_APP_URL, SCREENSHOT_OUTPUT_DIR, CHROME_USER_DATA_DIR, CHROMEDRIVER_PATH,
+    WEB_APP_URL, WEB_APP_LOGIN_URL, SCREENSHOT_OUTPUT_DIR, CHROME_USER_DATA_DIR, CHROMEDRIVER_PATH,
     SCHEDULE_CLICK_X_OFFSET, SCHEDULE_CLICK_Y_OFFSET, FLUTTER_VIEW_LOCATOR,
     MAX_DRAG_ATTEMPTS, DRAG_AMOUNT_Y_PIXELS, DRAG_START_X_OFFSET,
     DRAG_START_Y_OFFSET_RELATIVE_TO_ELEMENT_HEIGHT,
     END_OF_SCROLL_INDICATOR_LOCATOR,
     SCROLL_FLUTTER_VIEW_AND_CAPTURE
 )
+
+# selenium imports
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 
-SCRIPT_VERSION = "0.0.80"
 
 def cleanup_environment():
+
     """Remove old Chrome user data and screenshots for a fresh run."""
     print(f"Cleaning up old Chrome user data directory: {CHROME_USER_DATA_DIR}")
+
     if os.path.exists(CHROME_USER_DATA_DIR):
         try:
             shutil.rmtree(CHROME_USER_DATA_DIR)
@@ -76,7 +81,8 @@ def cleanup_environment():
     os.makedirs(SCREENSHOT_OUTPUT_DIR, exist_ok=True)
     print(f"Ensured screenshot output directory exists: {SCREENSHOT_OUTPUT_DIR}")
 
-def launch_browser(headless=True):
+
+def launch_browser(headless=False):
     """Launch Chrome with required options."""
     chrome_options = Options()
     if headless:
@@ -111,13 +117,58 @@ def launch_browser(headless=True):
     driver = initialize_undetected_chrome_driver(options=chrome_options)
     return driver
 
-def wait_for_login(driver):
-    """Wait for user to log in and solve any CAPTCHA."""
-    print("\n--- ATTENTION REQUIRED ---")
-    print("Please log in and solve any CAPTCHA in the Chrome window.")
-    input("Press ENTER here after you are logged in and see the dashboard...\n")
+
+def handle_thd_login (driver):
+
+
+    # Define the current URL
+    current_url = driver.current_url
+    prev_url  = WEB_APP_LOGIN_URL
+    sleep_time  = 10
+
+    current_url = driver.current_url.split("?") [0]
+    print(current_url)
+
+    print("current URL:", current_url)
+
+    while current_url == prev_url:
+
+        # Wait for the URL to change
+        print("waiting for change in  current URL:", current_url)
+        current_url = driver.current_url.split("?") [0]
+        time.sleep(sleep_time)
+
+    # Print the new URL
+    current_url = driver.current_url.split("?") [0]
+    prev_url = driver.current_url.split("?") [0]
+    print("NEW current URL:", current_url)
+
+    while current_url == prev_url:
+        # Wait for the URL to change
+        current_url = driver.current_url.split("?") [0]
+        print("waiting for next change in  current URL:", current_url)
+        time.sleep(sleep_time)
+    
+    # Print the new URL
+    current_url = driver.current_url.split("?") [0]
+    prev_url = driver.current_url.split("?") [0]
+    print("New current URL:", driver.current_url)
+
+    while current_url == prev_url:
+        # Wait for the URL to change
+        current_url = driver.current_url.split("?") [0]
+        print("waiting for next change in  current URL:", current_url)
+        time.sleep(sleep_time)
+
+    # Print the new URL
+    current_url = driver.current_url.split("?") [0]
+    prev_url = driver.current_url.split("?") [0]
+    print("New current URL:", driver.current_url)
+
+
     try:
-        WebDriverWait(driver, 10).until(
+        #WebDriverWait(driver, 10).until(
+        WebDriverWait(driver, 600).until(
             EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
         )
         print("Login and CAPTCHA complete. Proceeding with automation.")
@@ -126,44 +177,6 @@ def wait_for_login(driver):
         driver.quit()
         exit(1)
 
-def interactive_find_click_coordinates(driver, flutter_view_element, num_clicks=5):
-    """
-    Guide the user through a process to find and record click coordinates.
-    After each click, a screenshot is saved so the user can use Paint or another tool
-    to determine the next coordinates.
-    """
-    print("\n--- INTERACTIVE CLICK COORDINATE DISCOVERY ---")
-    click_coords = []
-    for i in range(num_clicks):
-        print(f"\nStep {i+1} of {num_clicks}:")
-        x = input(f"Enter X offset for click #{i+1} (pixels, relative to schedule area): ")
-        y = input(f"Enter Y offset for click #{i+1} (pixels, relative to schedule area): ")
-        try:
-            x = int(x)
-            y = int(y)
-        except ValueError:
-            print("Invalid input. Please enter integer values.")
-            continue
-
-        perform_mouse_click_on_element(driver, flutter_view_element, x, y)
-        print(f"Clicked at ({x}, {y}). Waiting for UI to update...")
-        time.sleep(2)  # Wait for UI to update
-
-        # Take a screenshot after the click
-        snapshot_path = os.path.join(SCREENSHOT_OUTPUT_DIR, f"step_{i+1}_snapshot.png")
-        flutter_view_element.screenshot(snapshot_path)
-        print(f"Snapshot saved: {snapshot_path}")
-        print("Use Paint or another tool to inspect this image and determine the next click coordinates.")
-
-        click_coords.append((x, y))
-
-    print("\nInteractive click coordinate discovery complete.")
-    print("Collected click coordinates (in order):")
-    for idx, (x, y) in enumerate(click_coords, 1):
-        print(f"  Click #{idx}: ({x}, {y})")
-    print("You can now use these coordinates in your automation sequence.")
-
-    return click_coords
 
 def interactive_snapshot_and_exit(driver, flutter_view_element, step_name="step"):
     """
@@ -178,6 +191,7 @@ def interactive_snapshot_and_exit(driver, flutter_view_element, step_name="step"
     #driver.quit()
     #exit(0)
 
+
 def perform_mouse_click_on_element(driver, element, x_offset, y_offset):
     """Clicks at a specific offset within a given element."""
     from selenium.webdriver.common.action_chains import ActionChains
@@ -186,18 +200,6 @@ def perform_mouse_click_on_element(driver, element, x_offset, y_offset):
     actions.move_to_element_with_offset(element, x_offset, y_offset).click().perform()
     print(f"Mouse click performed at offset ({x_offset}, {y_offset}) within element.")
 
-def js_swipe(driver, element, start_x, start_y, end_x, end_y):
-    driver.execute_script("""
-        const rect = arguments[0].getBoundingClientRect();
-        const startX = rect.left + arguments[1];
-        const startY = rect.top + arguments[2];
-        const endX = rect.left + arguments[3];
-        const endY = rect.top + arguments[4];
-        const dataTransfer = new DataTransfer();
-        arguments[0].dispatchEvent(new PointerEvent('pointerdown', {clientX: startX, clientY: startY, bubbles: true}));
-        arguments[0].dispatchEvent(new PointerEvent('pointermove', {clientX: endX, clientY: endY, bubbles: true}));
-        arguments[0].dispatchEvent(new PointerEvent('pointerup', {clientX: endX, clientY: endY, bubbles: true}));
-    """, element, start_x, start_y, end_x, end_y)
 
 def click_canvas_at(driver, canvas_element, x, y):
     """
@@ -225,73 +227,6 @@ def click_canvas_at(driver, canvas_element, x, y):
     """, canvas_element, x, y)
     print(f"Canvas pointerdown/pointerup dispatched at ({x}, {y}) relative to canvas.")
 
-def random_canvas_clicks(driver, canvas_element, num_clicks=10):
-    """
-    Perform a series of pseudo-random clicks on the canvas to test for interaction.
-    """
-    rect = canvas_element.rect
-    width = int(rect['width'])
-    height = int(rect['height'])
-    print(f"Canvas element size: width={width}, height={height}")
-
-    for i in range(num_clicks):
-        x = random.randint(0, width - 1)
-        y = random.randint(0, height - 1)
-        print(f"Random click #{i+1} at ({x}, {y})")
-        click_canvas_at(driver, canvas_element, x, y)
-        time.sleep(1)  # Short pause to observe any effect
-
-def swipe_canvas(driver, canvas_element, start_x, start_y, end_x, end_y, duration_ms=300, steps=10):
-    """
-    Simulate a swipe (drag) gesture on a canvas from (start_x, start_y) to (end_x, end_y).
-    Sends multiple pointermove events to mimic a real swipe.
-    """
-    driver.execute_script("""
-        const canvas = arguments[0];
-        const rect = canvas.getBoundingClientRect();
-        const startX = rect.left + arguments[1];
-        const startY = rect.top + arguments[2];
-        const endX = rect.left + arguments[3];
-        const endY = rect.top + arguments[4];
-        const duration = arguments[5];
-        const steps = arguments[6];
-
-        function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-
-        async function swipe() {
-            const downEvent = new PointerEvent('pointerdown', {
-                clientX: startX,
-                clientY: startY,
-                bubbles: true,
-                pointerType: 'touch'
-            });
-            canvas.dispatchEvent(downEvent);
-
-            for (let i = 1; i <= steps; i++) {
-                const progress = i / steps;
-                const moveX = startX + (endX - startX) * progress;
-                const moveY = startY + (endY - startY) * progress;
-                const moveEvent = new PointerEvent('pointermove', {
-                    clientX: moveX,
-                    clientY: moveY,
-                    bubbles: true,
-                    pointerType: 'touch'
-                });
-                canvas.dispatchEvent(moveEvent);
-                await sleep(duration / steps);
-            }
-
-            const upEvent = new PointerEvent('pointerup', {
-                clientX: endX,
-                clientY: endY,
-                bubbles: true,
-                pointerType: 'touch'
-            });
-            canvas.dispatchEvent(upEvent);
-        }
-        swipe();
-    """, canvas_element, start_x, start_y, end_x, end_y, duration_ms, steps)
-    print(f"Swipe gesture from ({start_x}, {start_y}) to ({end_x}, {end_y}) dispatched on canvas.")
 
 def scroll_canvas_with_wheel(driver, canvas_element, delta_y, steps=1, delay=0.2, x=1200, y=300):
     """
@@ -317,25 +252,6 @@ def scroll_canvas_with_wheel(driver, canvas_element, delta_y, steps=1, delay=0.2
         print(f"Dispatched wheel event #{i+1} with deltaY={delta_y} at ({x}, {y})")
         time.sleep(delay)
 
-def move_mouse_to_canvas(driver, canvas_element, x, y):
-    """
-    Move the mouse pointer to (x, y) relative to the top-left of the canvas element.
-    This does not click, just moves the pointer.
-    """
-    driver.execute_script("""
-        const canvas = arguments[0];
-        const rect = canvas.getBoundingClientRect();
-        const x = arguments[1];
-        const y = arguments[2];
-        const moveEvent = new PointerEvent('pointermove', {
-            clientX: rect.left + x,
-            clientY: rect.top + y,
-            bubbles: true,
-            pointerType: 'mouse'
-        });
-        canvas.dispatchEvent(moveEvent);
-    """, canvas_element, x, y)
-    print(f"Mouse pointer moved to ({x}, {y}) on canvas.")
 
 def save_canvas_snapshot(canvas_element, step_name):
     """
@@ -346,7 +262,11 @@ def save_canvas_snapshot(canvas_element, step_name):
     print(f"Canvas snapshot saved: {snapshot_path}")
     return snapshot_path
 
-def navigate_to_schedule(driver):
+
+def snapshot_schedule_entries (driver):
+    
+    # scroll through the schedule canvas and snapshot them
+
     flutter_view_element = WebDriverWait(driver, 30).until(
         EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
     )
@@ -461,7 +381,11 @@ def navigate_to_schedule(driver):
            #    scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=130, steps=1, delay=1, x=1200, y=350)
            time.sleep(1)
 
+
+#def ocr_schedule_snapshots():
+    
     # OCR all snapshots and write results to file
+
     output_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "all_ocr_results.txt")
     with open(output_path, "w", encoding="utf-8") as f:
         for i in range(1, num_scrolls + 1):
@@ -474,7 +398,7 @@ def navigate_to_schedule(driver):
             print(f"--- OCR Result {i} ---\n{text}\n{'-'*40}")
             f.write(f"--- OCR Result {i} ---\n{text}\n{'-'*40}\n")
 
-    print(f"OCR results saved to {output_path}")
+    #print(f"OCR results saved to {output_path}")
 
     # Save OCR results to CSV
     output_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results.csv")
@@ -495,7 +419,7 @@ def navigate_to_schedule(driver):
             # Write filename and OCR text as a row
             writer.writerow([os.path.basename(img_path), text.strip().replace('\n', ' ')])
 
-    print(f"OCR CSV results saved to {output_csv_path}")
+    #print(f"OCR CSV results saved to {output_csv_path}")
 
     # After writing ocr_results.csv
     structured_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results_structured.csv")
@@ -505,63 +429,33 @@ def navigate_to_schedule(driver):
         writer.writeheader()
         for entry in entries:
             writer.writerow(entry)
-    print(f"Structured CSV written to {structured_csv_path}")
+    #print(f"Structured CSV written to {structured_csv_path}")
+
 
     return output_path, output_csv_path, structured_csv_path  # Return all paths
 
 
-# -- EXECUTION START ---
+""" ----------------------------------------------------------------------------------- """
 
-parser = argparse.ArgumentParser(
-    description="Extract schedule data from web app.",
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter
-)
-parser.add_argument("--manual_login", action="store_true", help="Require manual login instead of using environment variables.")
-parser.add_argument("--enable_browser", action="store_true", help="Show browser window (not headless).")
-args = parser.parse_args()
+if __name__ == "__main__":
 
-print(f"--- Schedule Extractor Script (v{SCRIPT_VERSION}) ---")
-cleanup_environment()
-driver = launch_browser(headless=not args.enable_browser)
-driver.get(WEB_APP_URL)
+   
+    # cleanup from prevous run, start browser and login to website
+    cleanup_environment()
+    driver = launch_browser(headless=False)
+    driver.get(WEB_APP_URL)
 
-if args.manual_login:
-    print("Manual login mode enabled. Please log in and solve any CAPTCHA in the Chrome window.")
-    wait_for_login(driver)
-else:
-    sleep_time =120
-    print(f"Auto login mode enabled. Sleeping for {sleep_time}")
-    time.sleep(sleep_time)  # Wait for turing test to complete
-    USERNAME = os.environ.get("SCHEDULE_USERNAME")
-    PASSWORD = os.environ.get("SCHEDULE_PASSWORD")
-    if USERNAME and PASSWORD:
-        print("Logging in with credentials from environment variables...")
-        perform_login(driver, USERNAME, PASSWORD)
-        # Wait for dashboard after automated login
-        print(f"Waiting for dashboard after login. Sleeping for {sleep_time}")
-        time.sleep(sleep_time)  # Wait for turing test to complete
-        try:
-            WebDriverWait(driver, 30).until(
-                EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
-            )
-            print("Automated login complete. Proceeding with automation.")
-        except Exception as e:
-            print("Automated login failed or dashboard did not load. Please check credentials or site status.")
-            driver.quit()
-            exit(1)
-    else:
-        print("Environment variables SCHEDULE_USERNAME and/or SCHEDULE_PASSWORD not set. Exiting.")
-        driver.quit()
-        exit(1)
+    # handle login and hop to home depot dashboard
+    print("calling hand_thd_login()")
+    handle_thd_login (driver)
 
-# Step 2: Navigate to schedule and discover click coordinates
-output_path, output_csv_path, structured_csv_path = navigate_to_schedule(driver)
+    # traverse the schedule and take snapshots of schedule entires
+    print("calling snapshot_schedule_entries()")
+    output_path, output_csv_path, structured_csv_path = snapshot_schedule_entries(driver)
 
-print("\n--- SCRIPT COMPLETED ---")
-print(f"OCR results saved to: {output_path}")
-print(f"OCR CSV results saved to: {output_csv_path}")
-print(f"Structured CSV written to: {structured_csv_path}")
-print("Review the saved snapshots and update your code/config with the new coordinates.")
-print("Rerun the script when ready to continue with automation.")
-driver.quit()
-del driver  # Helps ensure cleanup
+    # script Wrap-up 
+    print("\n--- SCRIPT COMPLETED ---")
+    print(f"OCR results saved to: {output_path}")
+    print(f"OCR CSV results saved to: {output_csv_path}")
+    print(f"Structured CSV written to: {structured_csv_path}")
+

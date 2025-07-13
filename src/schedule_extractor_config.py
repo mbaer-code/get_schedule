@@ -39,6 +39,7 @@ TESSERACT_PATH = r'C:\\Program Files\\TESSERACT-OCR\\tesseract.exe' # Corrected 
 
 # URL of the web application you want to access
 WEB_APP_URL = 'https://wft.homedepot.com/'
+WEB_APP_LOGIN_URL = 'https://identity.homedepot.com/as/LsQp3/resume/as/authorization.ping'
 
 # --- ABSOLUTE PATH FOR SCREENSHOT OUTPUT ---
 # Screenshots will now always be saved here, regardless of CWD.

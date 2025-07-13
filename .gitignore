@@ -6,6 +6,7 @@ calendar/
 *.pyc
 *.csv
 *.swp
+*.out
 
 credentials.json
 token.json

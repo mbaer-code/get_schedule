@@ -480,19 +480,19 @@ if __name__ == "__main__":
 
    
     # cleanup from prevous run, start browser and login to website
-    #cleanup_environment()
-    #driver = launch_browser(headless=False)
-    #driver.get(WEB_APP_URL)
-    #structured_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results_structured.csv")
+    cleanup_environment()
+    driver = launch_browser(headless=False)
+    driver.get(WEB_APP_URL)
+    structured_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results_structured.csv")
     structured_csv_path = OCR_FILEPATH
 
     # handle login and hop to home depot dashboard
-    #print("calling hand_thd_login()")
-    #handle_thd_login (driver)
+    print("calling hand_thd_login()")
+    handle_thd_login (driver)
 
     # traverse the schedule and take snapshots of schedule entires
     print("calling snapshot_schedule_entries()")
-    #output_path, output_csv_path, structured_csv_path = snapshot_schedule_entries(driver)
+    output_path, output_csv_path, structured_csv_path = snapshot_schedule_entries(driver)
 
     # prompt user to create calendar entires
     #create_calendar_events_from_results(structured_csv_path)
@@ -500,7 +500,7 @@ if __name__ == "__main__":
 
     # script Wrap-up 
     print("\n--- SCRIPT COMPLETED ---")
-    #print(f"OCR results saved to: {output_path}")
+    print(f"OCR results saved to: {output_path}")
     #print(f"OCR CSV results saved to: {output_csv_path}")
-    #print(f"Structured CSV written to: {structured_csv_path}")
+    print(f"Structured CSV written to: {structured_csv_path}")
 

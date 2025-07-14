@@ -45,11 +45,15 @@ from schedule_extractor_utils import (
 from schedule_extractor_config import (
     WEB_APP_URL, WEB_APP_LOGIN_URL, SCREENSHOT_OUTPUT_DIR, CHROME_USER_DATA_DIR, CHROMEDRIVER_PATH,
     SCHEDULE_CLICK_X_OFFSET, SCHEDULE_CLICK_Y_OFFSET, FLUTTER_VIEW_LOCATOR,
+    OCR_FILEPATH,
     MAX_DRAG_ATTEMPTS, DRAG_AMOUNT_Y_PIXELS, DRAG_START_X_OFFSET,
     DRAG_START_Y_OFFSET_RELATIVE_TO_ELEMENT_HEIGHT,
     END_OF_SCROLL_INDICATOR_LOCATOR,
     SCROLL_FLUTTER_VIEW_AND_CAPTURE
 )
+
+# calendar_builder imports
+from calendar_builder import main as create_calendar_events
 
 # selenium imports
 from selenium.webdriver.support.ui import WebDriverWait
@@ -351,7 +355,7 @@ def snapshot_schedule_entries (driver):
         time.sleep(2)  # Give time for the view to update
 
         # 4. Re-locate the canvas element after navigation
-        flutter_view_element = WebDriverWait(driver, 30).until(
+        flutter_view_element = WebDriverWait(driver, 60).until(
             EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
         )
 
@@ -381,8 +385,6 @@ def snapshot_schedule_entries (driver):
            #    scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=130, steps=1, delay=1, x=1200, y=350)
            time.sleep(1)
 
-
-#def ocr_schedule_snapshots():
     
     # OCR all snapshots and write results to file
 
@@ -435,27 +437,70 @@ def snapshot_schedule_entries (driver):
     return output_path, output_csv_path, structured_csv_path  # Return all paths
 
 
+#def create_calendar_events_from_results(structured_csv_path):
+def create_calendar_events_from_results():
+    """Optional final step to create Google Calendar events"""
+    try:
+
+        """
+
+        # Ask user if they want to create calendar events
+        create_calendar = input("\nWould you like to create Google Calendar events? (y/n): ").lower().strip()
+        if create_calendar != 'y':
+            print("Skipping calendar creation.")
+            return
+
+        calendar_id = input("Enter Google Calendar ID (or 'primary' for default): ").strip()
+        if not calendar_id:
+            print("No calendar ID provided. Skipping calendar creation.")
+            return
+
+        # Import and use build_calendar functionality
+        print(f"\n=== STEP 3: CREATING CALENDAR EVENTS ===")
+        print(f"Using calendar: {calendar_id}")
+        print(f"Using CSV: {structured_csv_path}")
+
+        # You would need to import and call the calendar creation logic here
+        # from build_calendar import main as create_calendar_events
+
+        """
+
+        #create_calendar_events(calendar_id, structured_csv_path)
+        create_calendar_events()
+
+        print("Calendar events created successfully!")
+
+    except Exception as e:
+        print(f"Error creating calendar events: {e}")
+
+
 """ ----------------------------------------------------------------------------------- """
 
 if __name__ == "__main__":
 
    
     # cleanup from prevous run, start browser and login to website
-    cleanup_environment()
-    driver = launch_browser(headless=False)
-    driver.get(WEB_APP_URL)
+    #cleanup_environment()
+    #driver = launch_browser(headless=False)
+    #driver.get(WEB_APP_URL)
+    #structured_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results_structured.csv")
+    structured_csv_path = OCR_FILEPATH
 
     # handle login and hop to home depot dashboard
-    print("calling hand_thd_login()")
-    handle_thd_login (driver)
+    #print("calling hand_thd_login()")
+    #handle_thd_login (driver)
 
     # traverse the schedule and take snapshots of schedule entires
     print("calling snapshot_schedule_entries()")
-    output_path, output_csv_path, structured_csv_path = snapshot_schedule_entries(driver)
+    #output_path, output_csv_path, structured_csv_path = snapshot_schedule_entries(driver)
+
+    # prompt user to create calendar entires
+    #create_calendar_events_from_results(structured_csv_path)
+    create_calendar_events_from_results()
 
     # script Wrap-up 
     print("\n--- SCRIPT COMPLETED ---")
-    print(f"OCR results saved to: {output_path}")
-    print(f"OCR CSV results saved to: {output_csv_path}")
-    print(f"Structured CSV written to: {structured_csv_path}")
+    #print(f"OCR results saved to: {output_path}")
+    #print(f"OCR CSV results saved to: {output_csv_path}")
+    #print(f"Structured CSV written to: {structured_csv_path}")
 

@@ -41,9 +41,10 @@ TESSERACT_PATH = r'C:\\Program Files\\TESSERACT-OCR\\tesseract.exe' # Corrected 
 WEB_APP_URL = 'https://wft.homedepot.com/'
 WEB_APP_LOGIN_URL = 'https://identity.homedepot.com/as/LsQp3/resume/as/authorization.ping'
 
-# --- ABSOLUTE PATH FOR SCREENSHOT OUTPUT ---
-# Screenshots will now always be saved here, regardless of CWD.
-SCREENSHOT_OUTPUT_DIR = 'C:\\temp\\ScheduleScreenshots'
+# --- ABSOLUTE PATH FOR SCREENSHOT and OCR OUTPUT ---
+SCREENSHOT_OUTPUT_DIR = r'C:\\temp\\ScheduleScreenshots'
+OCR_OUTPUT_FILENAME = f'ocr_results_structured.csv'
+OCR_FILEPATH = f'{SCREENSHOT_OUTPUT_DIR}/{OCR_OUTPUT_FILENAME}'
 SCREENSHOT_BASE_NAME = 'flutter_view_screenshot' # Base name, will add _0, _1, etc.
 
 # User data directory for Chrome. This stores your browser profile (cookies, login sessions).
@@ -56,19 +57,7 @@ CHROME_USER_DATA_DIR = "C:\\SeleniumChromeProfile"
 CHROME_MAJOR_VERSION = 138 # <--- IMPORTANT: YOU NEED TO PROVIDE THIS 
 
 
-# --- USER CREDENTIALS (for automated login) ---
-# IMPORTANT: These will be prompted at runtime and NOT stored in the script file.
-USERNAME_PROMPT = "" # Will be filled by user input
-PASSWORD_PROMPT = "" # Will be filled by user input
-
-# --- LOGIN PAGE ELEMENT LOCATORS ---
-# These were identified by user.
-LOGIN_USERNAME_LOCATOR = (By.ID, "inputUsername")
-LOGIN_PASSWORD_LOCATOR = (By.ID, "inputPassword")
-LOGIN_BUTTON_LOCATOR = (By.ID, "buttonSignOn")
-
-
-# --- NEW CONFIGURATION FOR FLUTTER VIEW TARGETING ---
+# --- CONFIGURATION FOR FLUTTER VIEW TARGETING ---
 # Identified from the provided Elements window content:
 # The Flutter application is contained within a <flutter-view> element.
 FLUTTER_VIEW_LOCATOR = (By.TAG_NAME, "flutter-view")
@@ -93,7 +82,6 @@ SCHEDULE_MINIMIZE_PRIMARY_Y = 440 # CONFIRMED: Y coordinate for primary calendar
 # This appears AFTER the primary graphic is minimized.
 SCHEDULE_MINIMIZE_SECONDARY_X = 215 # CONFIRMED from Bounding Box (Center X for secondary minimizer)
 SCHEDULE_MINIMIZE_SECONDARY_Y = 284 # CONFIRMED from Bounding Box (Center Y for secondary minimizer)
-
 
 # --- OCR IMAGE CROPPING AND PRE-PROCESSING SETTINGS ---
 # Set to True if you want to crop the screenshot before OCR.

@@ -23,28 +23,83 @@ import time
 from datetime import datetime, timedelta
 from selenium.webdriver.common.by import By
 
-def check_for_running_chrome_processes():
-    """Check if Chrome is running and prompt the user to close it if so."""
-    if os.name == "nt":
-        tasks = subprocess.check_output('tasklist', shell=True).decode()
-        if "chrome.exe" in tasks:
-            print("Please close all Chrome windows before running this script.")
-            input("Press ENTER after closing Chrome...")
-            return True
-    else:
+# Import psutil for robust process management
+import psutil
+
+def is_chrome_running():
+    """
+    Checks if any Google Chrome or ChromeDriver process is currently running using psutil.
+    Returns True if any are found, False otherwise.
+    """
+    for proc in psutil.process_iter(['name']):
         try:
-            tasks = subprocess.check_output(['pgrep', 'chrome'])
-            if tasks:
-                print("Please close all Chrome windows before running this script.")
-                input("Press ENTER after closing Chrome...")
+            process_name = proc.info['name'].lower()
+            if 'chrome.exe' in process_name or \
+               'google chrome' in process_name or \
+               'chromedriver.exe' in process_name:
                 return True
-        except subprocess.CalledProcessError:
-            pass
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            # Process may have terminated between check and access, or access denied
+            continue
     return False
+
+def kill_chrome_processes():
+    """
+    Terminates all Google Chrome and ChromeDriver processes found using psutil.
+    Provides feedback on termination status.
+    """
+    print("Checking for and terminating existing Chrome/ChromeDriver processes...")
+    killed_any = False
+    for proc in psutil.process_iter(['name', 'pid']):
+        try:
+            process_name = proc.info['name'].lower()
+            if 'chrome.exe' in process_name or \
+               'chromedriver.exe' in process_name or \
+               'google chrome' in process_name:
+                print(f"Terminating process: {proc.info['name']} (PID: {proc.info['pid']})")
+                proc.terminate() # Request graceful termination
+                killed_any = True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+
+    if killed_any:
+        print("Waiting for processes to terminate...")
+        time.sleep(2) # Give some time for processes to actually terminate
+
+        # Verify if any Chrome processes are still running after termination attempt
+        if is_chrome_running():
+            print("Warning: Some Chrome processes might still be running after termination attempt.")
+            print("Consider using 'proc.kill()' for a more forceful termination if issues persist.")
+        else:
+            print("All detected Chrome/ChromeDriver processes have been terminated.")
+    else:
+        print("No Chrome/ChromeDriver processes were found running.")
+
+# The original check_for_running_chrome_processes is now replaced by the psutil ones.
+# You can remove the old one entirely or rename it if you still need it for some reason.
+# For simplicity and automation, the new psutil functions are preferred.
+# def check_for_running_chrome_processes():
+#     """Check if Chrome is running and prompt the user to close it if so."""
+#     if os.name == "nt":
+#         tasks = subprocess.check_output('tasklist', shell=True).decode()
+#         if "chrome.exe" in tasks:
+#             print("Please close all Chrome windows before running this script.")
+#             input("Press ENTER after closing Chrome...")
+#             return True
+#     else:
+#         try:
+#             tasks = subprocess.check_output(['pgrep', 'chrome'])
+#             if tasks:
+#                 print("Please close all Chrome windows before running this script.")
+#                 input("Press ENTER after closing Chrome...")
+#                 return True
+#         except subprocess.CalledProcessError:
+#             pass
+#     return False
 
 def initialize_undetected_chrome_driver(options=None):
     import undetected_chromedriver as uc
-    from schedule_extractor_config import CHROMEDRIVER_PATH
+    from schedule_extractor_config import CHROMEDRIVER_PATH # Ensure this is correctly imported or passed
     if options is None:
         options = uc.ChromeOptions()
         options.add_argument("--start-maximized")
@@ -177,12 +232,9 @@ def parse_ocr_csv(csv_path):
             results.append(entry)
     return results
 
-try:
-    # ... your main script logic ...
-    driver.quit()
-except Exception as e:
-    print(f"Exception during script execution: {e}")
-    try:
-        driver.quit()
-    except Exception:
-        pass
+# The `driver.quit()` calls at the end of the original utils file
+# are typically handled in the main script's `finally` block or at the end of `if __name__ == "__main__":`.
+# Keeping them here can lead to issues if the driver object isn't available or if the utils file is
+# imported in a context where a driver isn't meant to be immediately quit.
+# I've removed them from this version of the utils file.
+# You already have `driver.quit()` in your main script's `finally` block.

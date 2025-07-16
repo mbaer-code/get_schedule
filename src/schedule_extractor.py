@@ -26,12 +26,15 @@ import random
 import pytesseract
 import datetime
 import csv
-#import argparse
+import sys # Added for command-line argument handling
+import tkinter as tk # Added for GUI dialog
+from tkinter import simpledialog # Added for GUI dialog
 from PIL import Image
 
 # utils imports
 from schedule_extractor_utils import (
-    check_for_running_chrome_processes,
+    is_chrome_running,          # NEW: For checking if Chrome is running
+    kill_chrome_processes,      # NEW: For terminating Chrome processes
     initialize_undetected_chrome_driver,
     perform_login,
     perform_minimization_sequence,
@@ -53,6 +56,7 @@ from schedule_extractor_config import (
 )
 
 # calendar_builder imports
+# Assuming calendar_builder.main will be updated to accept calendar_id and structured_csv_path
 from calendar_builder import main as create_calendar_events
 
 # selenium imports
@@ -64,7 +68,6 @@ from selenium.webdriver.chrome.service import Service
 
 
 def cleanup_environment():
-
     """Remove old Chrome user data and screenshots for a fresh run."""
     print(f"Cleaning up old Chrome user data directory: {CHROME_USER_DATA_DIR}")
 
@@ -110,7 +113,7 @@ def launch_browser(headless=False):
     chrome_options.add_argument("--disable-default-apps")
     chrome_options.add_argument("--disable-hang-monitor")
     chrome_options.add_argument("--disable-popup-blocking")
-    chrome_options.add_argument("--disable-prompt-on-repost")
+    chrome_options.add_argument("--disable-prompt-on_repost")
     chrome_options.add_argument("--disable-sync")
     chrome_options.add_argument("--disable-translate")
     chrome_options.add_argument("--allow-running-insecure-content")
@@ -123,55 +126,53 @@ def launch_browser(headless=False):
 
 
 def handle_thd_login (driver):
-
-
     # Define the current URL
     current_url = driver.current_url
-    prev_url  = WEB_APP_LOGIN_URL
-    sleep_time  = 10
+    prev_url = WEB_APP_LOGIN_URL
+    sleep_time = 10
 
-    current_url = driver.current_url.split("?") [0]
+    current_url = driver.current_url.split("?")[0]
     print(current_url)
 
     print("current URL:", current_url)
 
     while current_url == prev_url:
-
         # Wait for the URL to change
-        print("waiting for change in  current URL:", current_url)
-        current_url = driver.current_url.split("?") [0]
+        print("waiting for change in current URL:", current_url)
+        current_url = driver.current_url.split("?")[0]
         time.sleep(sleep_time)
 
     # Print the new URL
-    current_url = driver.current_url.split("?") [0]
-    prev_url = driver.current_url.split("?") [0]
+    current_url = driver.current_url.split("?")[0]
+    prev_url = driver.current_url.split("?")[0]
     print("NEW current URL:", current_url)
 
     while current_url == prev_url:
         # Wait for the URL to change
-        current_url = driver.current_url.split("?") [0]
-        print("waiting for next change in  current URL:", current_url)
+        current_url = driver.current_url.split("?")[0]
+        print("waiting for next change in current URL:", current_url)
         time.sleep(sleep_time)
-    
+
     # Print the new URL
-    current_url = driver.current_url.split("?") [0]
-    prev_url = driver.current_url.split("?") [0]
+    current_url = driver.current_url.split("?")[0]
+    prev_url = driver.current_url.split("?")[0]
     print("New current URL:", driver.current_url)
+
 
     while current_url == prev_url:
         # Wait for the URL to change
-        current_url = driver.current_url.split("?") [0]
-        print("waiting for next change in  current URL:", current_url)
+        current_url = driver.current_url.split("?")[0]
+        print("waiting for next change in current URL:", current_url)
         time.sleep(sleep_time)
 
     # Print the new URL
-    current_url = driver.current_url.split("?") [0]
-    prev_url = driver.current_url.split("?") [0]
+    current_url = driver.current_url.split("?")[0]
+    prev_url = driver.current_url.split("?")[0]
     print("New current URL:", driver.current_url)
 
 
     try:
-        #WebDriverWait(driver, 10).until(
+        #WebDriverWait(driver, 10).until( # Original commented line, keeping it as is
         WebDriverWait(driver, 600).until(
             EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
         )
@@ -190,19 +191,10 @@ def interactive_snapshot_and_exit(driver, flutter_view_element, step_name="step"
     snapshot_path = os.path.join(SCREENSHOT_OUTPUT_DIR, f"{step_name}_snapshot.png")
     flutter_view_element.screenshot(snapshot_path)
     print(f"\nSnapshot saved: {snapshot_path}")
-    #print("Open this image in Paint or another tool to determine the next click coordinates.")
-    #print("Exit the script now, update your code/config with the new coordinates, and rerun when ready.")
-    #driver.quit()
-    #exit(0)
-
-
-def perform_mouse_click_on_element(driver, element, x_offset, y_offset):
-    """Clicks at a specific offset within a given element."""
-    from selenium.webdriver.common.action_chains import ActionChains
-    print(f"Attempting to click at offset ({x_offset}, {y_offset}) within element: {element}")
-    actions = ActionChains(driver)
-    actions.move_to_element_with_offset(element, x_offset, y_offset).click().perform()
-    print(f"Mouse click performed at offset ({x_offset}, {y_offset}) within element.")
+    #print("Open this image in Paint or another tool to determine the next click coordinates.") # Original commented line, keeping it as is
+    #print("Exit the script now, update your code/config with the new coordinates, and rerun when ready.") # Original commented line, keeping it as is
+    #driver.quit() # Original commented line, keeping it as is
+    #exit(0) # Original commented line, keeping it as is
 
 
 def click_canvas_at(driver, canvas_element, x, y):
@@ -268,16 +260,16 @@ def save_canvas_snapshot(canvas_element, step_name):
 
 
 def snapshot_schedule_entries (driver):
-    
+
     # scroll through the schedule canvas and snapshot them
 
     flutter_view_element = WebDriverWait(driver, 30).until(
         EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
     )
-    #time.sleep(20)
-    #print("Waiting 5 seconds before clicking through navigation steps...")
+    #time.sleep(20) # Original commented line, keeping it as is
+    #print("Waiting 5 seconds before clicking through navigation steps...") # Original commented line, keeping it as is
     interactive_snapshot_and_exit(driver, flutter_view_element, step_name="dashboard")
-    #time.sleep(10)
+    #time.sleep(10) # Original commented line, keeping it as is
 
     # Click the schedule tile
     click_canvas_at(driver, flutter_view_element, 300, 300)
@@ -285,7 +277,7 @@ def snapshot_schedule_entries (driver):
     interactive_snapshot_and_exit(driver, flutter_view_element, step_name="schedule_tile")
 
     # Minimize first graphic
-    #click_canvas_at(driver, flutter_view_element, 1200, 645)
+    #click_canvas_at(driver, flutter_view_element, 1200, 645) # Original commented line, keeping it as is
     click_canvas_at(driver, flutter_view_element, 1200, 550)
     time.sleep(2)
     interactive_snapshot_and_exit(driver, flutter_view_element, step_name="minimize_one")
@@ -303,35 +295,32 @@ def snapshot_schedule_entries (driver):
     time.sleep(2)
 
     print("Beginning snapshot and scroll loop...")
-    num_scrolls = 21  # Capture 21 day entries
+    num_scrolls = 21   # Capture 21 day entries
 
     for i in range(num_scrolls):
         print(f"iter {i} for the scroll loop...")
 
         # 0. Scroll down past the weekly hours summary
-
-        # jump over the devide
         print(f"testing for mod == {i % 7}...")
         if i % 7 == 0:
 
             print(f"i is mod 7: 0...")
             snap_name = f"weekly_summary_{i}"
             save_canvas_snapshot(flutter_view_element, snap_name)
-            
 
             absy = 195
 
             if i > 0:
-                #wsdelta = 250
-                #wsdelta = 190
+                #wsdelta = 250 # Original commented line, keeping it as is
+                #wsdelta = 190 # Original commented line, keeping it as is
                 wsdelta = 150
             else:
-                #wsdelta = 200
+                #wsdelta = 200 # Original commented line, keeping it as is
                 wsdelta = 100
 
 
-            #scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=95, steps=1, delay=1, x=1200, y=350)
-            #scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=95, steps=1, delay=1, x=1200, y=190)
+            #scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=95, steps=1, delay=1, x=1200, y=350) # Original commented line, keeping it as is
+            #scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=95, steps=1, delay=1, x=1200, y=190) # Original commented line, keeping it as is
             scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=wsdelta, steps=1, delay=1, x=1200, y=absy)
             snap_name = f"after_summary_{i}"
             save_canvas_snapshot(flutter_view_element, snap_name)
@@ -339,7 +328,7 @@ def snapshot_schedule_entries (driver):
             time.sleep(1)
 
         # 1. Click the button at (x=1200, y=270) before scrolling down
-        #print(f"Clicking button at (1200, 270) before scroll {i+1}...")
+        #print(f"Clicking button at (1200, 270) before scroll {i+1}...") # Original commented line, keeping it as is
         print(f"Clicking button at (1200, {absy}) before scroll {i+1}...")
         click_canvas_at(driver, flutter_view_element, 1200, absy)
         time.sleep(1)
@@ -352,7 +341,8 @@ def snapshot_schedule_entries (driver):
         # 3. Return to the DOM canvas using browser back
         print("Returning to DOM canvas...")
         driver.back()
-        time.sleep(2)  # Give time for the view to update
+        time.sleep(10)   # Give time for the view to update
+                         # if it ever expires again set it to 15
 
         # 4. Re-locate the canvas element after navigation
         flutter_view_element = WebDriverWait(driver, 60).until(
@@ -360,32 +350,31 @@ def snapshot_schedule_entries (driver):
         )
 
         # 5. Scroll down for the next day tile, except after last
-        #if i < num_scrolls - 1:
+        #if i < num_scrolls - 1: # Original commented line, keeping it as is
         if i < num_scrolls:
 
-            # Calculate the day of the week for the next tile
+            # Calculate the day of the week for the next tile # Original commented line, keeping it as is
 
-           #print(f"\nnext_day_of_week is: ", next_day_of_week )
-           #print(f"Scrolling down for next day tile (scroll {i+2})...\n")
-           #scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=120, steps=1, delay=0.5, x=1200, y=350)
+            #print(f"\nnext_day_of_week is: ", next_day_of_week ) # Original commented line, keeping it as is
+            #print(f"Scrolling down for next day tile (scroll {i+2})...\n") # Original commented line, keeping it as is
+            #scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=120, steps=1, delay=0.5, x=1200, y=350) # Original commented line, keeping it as is
 
-           delta = 114
+            delta = 114
 
-           #yabs  = 350
-           #yabs  = 210
-           yabs  = 290
+            #yabs  = 350 # Original commented line, keeping it as is
+            #yabs  = 210 # Original commented line, keeping it as is
+            yabs  = 290
 
-           print("Advancing wheel by {delta} px to next tile...")
-           #print(f"Scrolling down for next day tile (scroll {i+2})...\n")
-           scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=delta, steps=1, delay=1, x=1200, y=yabs)
+            print("Advancing wheel by {delta} px to next tile...")
+            #print(f"Scrolling down for next day tile (scroll {i+2})...\n") # Original commented line, keeping it as is
+            scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=delta, steps=1, delay=1, x=1200, y=yabs)
 
-           # If the next tile is Monday, skip the extra text tile
-           #if next_day_of_week == 0:
-           #    print("Advancing wheel by extra 160 px to skip over text before Monday...")
-           #    scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=130, steps=1, delay=1, x=1200, y=350)
-           time.sleep(1)
+            # If the next tile is Monday, skip the extra text tile # Original commented line, keeping it as is
+            #if next_day_of_week == 0: # Original commented line, keeping it as is
+            #   print("Advancing wheel by extra 160 px to skip over text before Monday...") # Original commented line, keeping it as is
+            #   scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=130, steps=1, delay=1, x=1200, y=350) # Original commented line, keeping it as is
+            time.sleep(1)
 
-    
     # OCR all snapshots and write results to file
 
     output_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "all_ocr_results.txt")
@@ -400,13 +389,13 @@ def snapshot_schedule_entries (driver):
             print(f"--- OCR Result {i} ---\n{text}\n{'-'*40}")
             f.write(f"--- OCR Result {i} ---\n{text}\n{'-'*40}\n")
 
-    #print(f"OCR results saved to {output_path}")
+    #print(f"OCR results saved to {output_path}") # Original commented line, keeping it as is
 
     # Save OCR results to CSV
     output_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results.csv")
     with open(output_csv_path, "w", encoding="utf-8", newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["filename", "ocr_text"])  # Header row
+        writer.writerow(["filename", "ocr_text"])   # Header row
 
         for i in range(1, num_scrolls + 1):
             img_path = os.path.join(SCREENSHOT_OUTPUT_DIR, f"detail_view_{i}_canvas.png")
@@ -421,7 +410,7 @@ def snapshot_schedule_entries (driver):
             # Write filename and OCR text as a row
             writer.writerow([os.path.basename(img_path), text.strip().replace('\n', ' ')])
 
-    #print(f"OCR CSV results saved to {output_csv_path}")
+    #print(f"OCR CSV results saved to {output_csv_path}") # Original commented line, keeping it as is
 
     # After writing ocr_results.csv
     structured_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results_structured.csv")
@@ -431,41 +420,42 @@ def snapshot_schedule_entries (driver):
         writer.writeheader()
         for entry in entries:
             writer.writerow(entry)
-    #print(f"Structured CSV written to {structured_csv_path}")
+    #print(f"Structured CSV written to {structured_csv_path}") # Original commented line, keeping it as is
+    return output_path, output_csv_path, structured_csv_path   # Return all paths
 
+"""
+def get_calendar_id_gui():
+    #Prompts the user for the Google Calendar ID using a simple GUI dialog.
+    print("DEBUG: Entering get_calendar_id_gui()")
+    try:
+        root = tk.Tk()
+        root.withdraw() # Hide the main tkinter window
+        print("DEBUG: Tkinter root created and hidden.")
+        calendar_id = simpledialog.askstring("Input", "Please enter the Google Calendar ID (e.g., 'primary'):",
+                                             parent=root)
+        print(f"DEBUG: simpledialog.askstring returned: '{calendar_id}'")
+        root.destroy() # Destroy the hidden root window after use
+        print("DEBUG: Tkinter root destroyed.")
+        return calendar_id
+    except Exception as e:
+        print(f"ERROR: Exception in get_calendar_id_gui: {e}")
+        # If Tkinter fails for some reason (e.g., missing DLLs in bundle),
+        # we might want to provide a fallback or a clear error message.
+        # For now, returning None will trigger the sys.exit(1) below.
+        return None
+""" 
 
-    return output_path, output_csv_path, structured_csv_path  # Return all paths
-
-
-#def create_calendar_events_from_results(structured_csv_path):
+# Updated to accept calendar_id and structured_csv_path
+#def create_calendar_events_from_results(calendar_id, structured_csv_path):
 def create_calendar_events_from_results():
     """Optional final step to create Google Calendar events"""
     try:
-
-        """
-
-        # Ask user if they want to create calendar events
-        create_calendar = input("\nWould you like to create Google Calendar events? (y/n): ").lower().strip()
-        if create_calendar != 'y':
-            print("Skipping calendar creation.")
-            return
-
-        calendar_id = input("Enter Google Calendar ID (or 'primary' for default): ").strip()
-        if not calendar_id:
-            print("No calendar ID provided. Skipping calendar creation.")
-            return
-
         # Import and use build_calendar functionality
         print(f"\n=== STEP 3: CREATING CALENDAR EVENTS ===")
-        print(f"Using calendar: {calendar_id}")
+        #print(f"Using calendar: {calendar_id}")
         print(f"Using CSV: {structured_csv_path}")
 
-        # You would need to import and call the calendar creation logic here
-        # from build_calendar import main as create_calendar_events
-
-        """
-
-        #create_calendar_events(calendar_id, structured_csv_path)
+        # Call the calendar creation logic, passing the obtained calendar_id and CSV path
         create_calendar_events()
 
         print("Calendar events created successfully!")
@@ -478,13 +468,46 @@ def create_calendar_events_from_results():
 
 if __name__ == "__main__":
 
-   
+    """
+    # --- Calendar ID Input Handling ---
+    calendar_id = None
+    print("DEBUG: Starting calendar ID input handling in __main__.")
+    # 1. Check for command-line argument first
+    if len(sys.argv) > 1:
+        calendar_id = sys.argv[1]
+        print(f"DEBUG: Calendar ID from command line: '{calendar_id}'")
+    else:
+        # 2. If no command-line argument, prompt with GUI
+        print("DEBUG: No calendar ID provided via command line. Attempting GUI prompt...")
+        calendar_id = get_calendar_id_gui()
+        if calendar_id is None: # User clicked Cancel or GUI failed
+            print("DEBUG: Calendar ID GUI input cancelled or failed (returned None). Exiting.")
+            sys.exit(1)
+        elif calendar_id == "": # User clicked OK with empty input
+            print("DEBUG: Calendar ID GUI input empty (returned ''). Exiting.")
+            sys.exit(1)
+        else:
+            print(f"DEBUG: Calendar ID from GUI: '{calendar_id}'")
+    print(f"DEBUG: Finished calendar ID input handling in __main__. Final calendar_id: '{calendar_id}'")
+    # --- End Calendar ID Input Handling ---
+    """
+
+
+    # --- Ensure no other Chrome instances are running ---
+    # First, check if Chrome is running and kill it if necessary
+    if is_chrome_running():
+        print("Chrome is currently running. Attempting to terminate existing instances...")
+        kill_chrome_processes()
+    else:
+        print("Chrome is not currently running.")
+    # --- End of Chrome process management ---
+
     # cleanup from prevous run, start browser and login to website
     cleanup_environment()
     driver = launch_browser(headless=False)
     driver.get(WEB_APP_URL)
-    structured_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results_structured.csv")
-    structured_csv_path = OCR_FILEPATH
+    # structured_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results_structured.csv") # Original line
+    structured_csv_path = OCR_FILEPATH # Using OCR_FILEPATH from config for consistency
 
     # handle login and hop to home depot dashboard
     print("calling hand_thd_login()")
@@ -494,13 +517,20 @@ if __name__ == "__main__":
     print("calling snapshot_schedule_entries()")
     output_path, output_csv_path, structured_csv_path = snapshot_schedule_entries(driver)
 
-    # prompt user to create calendar entires
-    #create_calendar_events_from_results(structured_csv_path)
+    # here is the call to create calendar entires
+    print(f"DEBUG: About to call create_calendar_events_from_results in calendar_builder.pywith no arguments'")
+    #create_calendar_events_from_results(calendar_id, structured_csv_path)
     create_calendar_events_from_results()
+    print("DEBUG: create_calendar_events_from_results call completed.")
 
-    # script Wrap-up 
+    # script Wrap-up
     print("\n--- SCRIPT COMPLETED ---")
     print(f"OCR results saved to: {output_path}")
-    #print(f"OCR CSV results saved to: {output_csv_path}")
+    #print(f"OCR CSV results saved to: {output_csv_path}") # Original commented line, keeping it as is
     print(f"Structured CSV written to: {structured_csv_path}")
 
+    # Always ensure the browser is closed properly at the end of the script
+    # This also ensures the undetected_chromedriver process is terminated.
+    if 'driver' in locals() and driver:
+        print("Closing Chrome browser.")
+        driver.quit()

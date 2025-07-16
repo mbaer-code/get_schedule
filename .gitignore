@@ -11,3 +11,5 @@ calendar/
 credentials.json
 token.json
 junk
+dist
+build

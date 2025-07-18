@@ -48,7 +48,7 @@ from schedule_extractor_utils import (
 from schedule_extractor_config import (
     WEB_APP_URL, WEB_APP_LOGIN_URL, SCREENSHOT_OUTPUT_DIR, CHROME_USER_DATA_DIR, CHROMEDRIVER_PATH,
     SCHEDULE_CLICK_X_OFFSET, SCHEDULE_CLICK_Y_OFFSET, FLUTTER_VIEW_LOCATOR,
-    OCR_FILEPATH,
+    OCR_FILEPATH, OCR_RESULTS_FILEPATH, OCR_CSV_FILEPATH,
     MAX_DRAG_ATTEMPTS, DRAG_AMOUNT_Y_PIXELS, DRAG_START_X_OFFSET,
     DRAG_START_Y_OFFSET_RELATIVE_TO_ELEMENT_HEIGHT,
     END_OF_SCROLL_INDICATOR_LOCATOR,
@@ -340,12 +340,14 @@ def snapshot_schedule_entries (driver):
 
         # 3. Return to the DOM canvas using browser back
         print("Returning to DOM canvas...")
-        driver.back()
-        time.sleep(10)   # Give time for the view to update
+        #driver.back()
+        driver.execute_script("window.history.go(-1)")
+
+        time.sleep(5)   # Give time for the view to update
                          # if it ever expires again set it to 15
 
         # 4. Re-locate the canvas element after navigation
-        flutter_view_element = WebDriverWait(driver, 60).until(
+        flutter_view_element = WebDriverWait(driver, 600).until(
             EC.visibility_of_element_located(FLUTTER_VIEW_LOCATOR)
         )
 
@@ -377,7 +379,7 @@ def snapshot_schedule_entries (driver):
 
     # OCR all snapshots and write results to file
 
-    output_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "all_ocr_results.txt")
+    output_path = OCR_RESULTS_FILEPATH
     with open(output_path, "w", encoding="utf-8") as f:
         for i in range(1, num_scrolls + 1):
             img_path = os.path.join(SCREENSHOT_OUTPUT_DIR, f"detail_view_{i}_canvas.png")
@@ -392,6 +394,7 @@ def snapshot_schedule_entries (driver):
     #print(f"OCR results saved to {output_path}") # Original commented line, keeping it as is
 
     # Save OCR results to CSV
+    output_csv_path = OCR_CSV_FILEPATH
     output_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results.csv")
     with open(output_csv_path, "w", encoding="utf-8", newline='') as csvfile:
         writer = csv.writer(csvfile)
@@ -413,7 +416,9 @@ def snapshot_schedule_entries (driver):
     #print(f"OCR CSV results saved to {output_csv_path}") # Original commented line, keeping it as is
 
     # After writing ocr_results.csv
-    structured_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results_structured.csv")
+    # structured_csv_path = os.path.join(SCREENSHOT_OUTPUT_DIR, "ocr_results_structured.csv")
+    structured_csv_path = OCR_FILEPATH
+
     entries = parse_ocr_csv(output_csv_path)
     with open(structured_csv_path, "w", encoding="utf-8", newline='') as f:
         writer = csv.DictWriter(f, fieldnames=COLUMN_NAMES)
@@ -423,7 +428,6 @@ def snapshot_schedule_entries (driver):
     #print(f"Structured CSV written to {structured_csv_path}") # Original commented line, keeping it as is
     return output_path, output_csv_path, structured_csv_path   # Return all paths
 
-"""
 def get_calendar_id_gui():
     #Prompts the user for the Google Calendar ID using a simple GUI dialog.
     print("DEBUG: Entering get_calendar_id_gui()")
@@ -443,11 +447,12 @@ def get_calendar_id_gui():
         # we might want to provide a fallback or a clear error message.
         # For now, returning None will trigger the sys.exit(1) below.
         return None
-""" 
 
 # Updated to accept calendar_id and structured_csv_path
+print("calling create_Calendar_events!")
 #def create_calendar_events_from_results(calendar_id, structured_csv_path):
-def create_calendar_events_from_results():
+def create_calendar_events_from_results(calendar_id):
+#def create_calendar_events_from_results():
     """Optional final step to create Google Calendar events"""
     try:
         # Import and use build_calendar functionality
@@ -456,7 +461,7 @@ def create_calendar_events_from_results():
         print(f"Using CSV: {structured_csv_path}")
 
         # Call the calendar creation logic, passing the obtained calendar_id and CSV path
-        create_calendar_events()
+        create_calendar_events(calendar_id)
 
         print("Calendar events created successfully!")
 
@@ -468,8 +473,8 @@ def create_calendar_events_from_results():
 
 if __name__ == "__main__":
 
-    """
     # --- Calendar ID Input Handling ---
+    #output_path = OCR_FILEPATH
     calendar_id = None
     print("DEBUG: Starting calendar ID input handling in __main__.")
     # 1. Check for command-line argument first
@@ -490,9 +495,13 @@ if __name__ == "__main__":
             print(f"DEBUG: Calendar ID from GUI: '{calendar_id}'")
     print(f"DEBUG: Finished calendar ID input handling in __main__. Final calendar_id: '{calendar_id}'")
     # --- End Calendar ID Input Handling ---
-    """
 
+    output_path         = OCR_RESULTS_FILEPATH
+    structured_csv_path = OCR_FILEPATH 
 
+    # turn off scraping here for debugging
+
+    # Prepare the environment for the script run
     # --- Ensure no other Chrome instances are running ---
     # First, check if Chrome is running and kill it if necessary
     if is_chrome_running():
@@ -517,10 +526,13 @@ if __name__ == "__main__":
     print("calling snapshot_schedule_entries()")
     output_path, output_csv_path, structured_csv_path = snapshot_schedule_entries(driver)
 
+    # turn off scraping end of block
+
+
     # here is the call to create calendar entires
     print(f"DEBUG: About to call create_calendar_events_from_results in calendar_builder.pywith no arguments'")
     #create_calendar_events_from_results(calendar_id, structured_csv_path)
-    create_calendar_events_from_results()
+    create_calendar_events_from_results(calendar_id)
     print("DEBUG: create_calendar_events_from_results call completed.")
 
     # script Wrap-up
@@ -528,6 +540,7 @@ if __name__ == "__main__":
     print(f"OCR results saved to: {output_path}")
     #print(f"OCR CSV results saved to: {output_csv_path}") # Original commented line, keeping it as is
     print(f"Structured CSV written to: {structured_csv_path}")
+
 
     # Always ensure the browser is closed properly at the end of the script
     # This also ensures the undetected_chromedriver process is terminated.

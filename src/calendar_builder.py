@@ -30,9 +30,9 @@ TOKEN_FILE = "token.json"
 CREDENTIALS_FILE = "credentials.json" # Your downloaded Google API credentials file
 
 # Removed get_events_by_date_and_title and delete_event as they are no longer needed for iCalUID approach.
-
+"""
 def get_calendar_id_gui():
-    """Prompts the user for the Google Calendar ID using a simple GUI dialog."""
+    # Prompts the user for the Google Calendar ID using a simple GUI dialog.
     print("DEBUG: Entering get_calendar_id_gui()")
     try:
         root = tk.Tk()
@@ -50,7 +50,7 @@ def get_calendar_id_gui():
         # we might want to provide a fallback or a clear error message.
         # For now, returning None will trigger the sys.exit(1) below.
         return None
-
+"""
 
 def create_event(service, calendar_id, event_body):
     """
@@ -124,7 +124,7 @@ def upsert_event_icaluid(service, calendar_id, event_data, calendar_timezone):
     print(f"Operation complete for event: '{event_title}' on {event_date}")
 
 
-def main():
+def main(calendar_id=None):
 
     """Shows basic usage of the Google Calendar API.
     Reads a CSV file and creates events in a specified Google Calendar.
@@ -264,4 +264,4 @@ def main():
         print(f"An unexpected error occurred: {e}")
 
 if __name__ == '__main__':
-    main()
+    main(calendar_id)

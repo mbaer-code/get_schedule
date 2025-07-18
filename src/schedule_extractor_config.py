@@ -41,10 +41,15 @@ TESSERACT_PATH = r'C:\\Program Files\\TESSERACT-OCR\\tesseract.exe' # Corrected 
 WEB_APP_URL = 'https://wft.homedepot.com/'
 WEB_APP_LOGIN_URL = 'https://identity.homedepot.com/as/LsQp3/resume/as/authorization.ping'
 
-# --- ABSOLUTE PATH FOR SCREENSHOT and OCR OUTPUT ---
-SCREENSHOT_OUTPUT_DIR = r'C:\\temp\\ScheduleScreenshots'
-OCR_OUTPUT_FILENAME = f'ocr_results_structured.csv'
-OCR_FILEPATH = f'{SCREENSHOT_OUTPUT_DIR}/{OCR_OUTPUT_FILENAME}'
+# --- ABSOLUTE PATH FOR SCREENSHOT, CSV and OCR OUTPUT ---
+SCREENSHOT_OUTPUT_DIR   = r'C:\\temp\\ScheduleScreenshots'
+OCR_OUTPUT_FILENAME     = f'ocr_results_structured.csv'
+OCR_RESULTS_FILENAME    = f'all_ocr_results.txt'
+OCR_CSV_FILENAME        = f'ocr_results.csv'
+OCR_FILEPATH            = f'{SCREENSHOT_OUTPUT_DIR}/{OCR_OUTPUT_FILENAME}'
+OCR_RESULTS_FILEPATH    = f'{SCREENSHOT_OUTPUT_DIR}/{OCR_RESULTS_FILENAME}'
+OCR_CSV_FILEPATH        = f'{SCREENSHOT_OUTPUT_DIR}/{OCR_CSV_FILENAME}'
+
 SCREENSHOT_BASE_NAME = 'flutter_view_screenshot' # Base name, will add _0, _1, etc.
 
 # User data directory for Chrome. This stores your browser profile (cookies, login sessions).

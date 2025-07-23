@@ -129,7 +129,7 @@ def handle_thd_login (driver):
     # Define the current URL
     current_url = driver.current_url
     prev_url = WEB_APP_LOGIN_URL
-    sleep_time = 10
+    sleep_time = 30
 
     current_url = driver.current_url.split("?")[0]
     print(current_url)
@@ -158,8 +158,10 @@ def handle_thd_login (driver):
     prev_url = driver.current_url.split("?")[0]
     print("New current URL:", driver.current_url)
 
+    # all of this is awful, but it works
+    #while current_url == prev_url:
+    while current_url != "https://wft.homedepot.com/": 
 
-    while current_url == prev_url:
         # Wait for the URL to change
         current_url = driver.current_url.split("?")[0]
         print("waiting for next change in current URL:", current_url)
@@ -183,7 +185,7 @@ def handle_thd_login (driver):
         exit(1)
 
 
-def interactive_snapshot_and_exit(driver, flutter_view_element, step_name="step"):
+def take_a_snapshot(driver, flutter_view_element, step_name="step"):
     """
     Take a snapshot of the current view, save it, and exit the script.
     The user can then open the image in Paint to determine the next click coordinates.
@@ -268,30 +270,30 @@ def snapshot_schedule_entries (driver):
     )
     #time.sleep(20) # Original commented line, keeping it as is
     #print("Waiting 5 seconds before clicking through navigation steps...") # Original commented line, keeping it as is
-    interactive_snapshot_and_exit(driver, flutter_view_element, step_name="dashboard")
+    take_a_snapshot(driver, flutter_view_element, step_name="dashboard")
     #time.sleep(10) # Original commented line, keeping it as is
 
     # Click the schedule tile
     click_canvas_at(driver, flutter_view_element, 300, 300)
     time.sleep(2)
-    interactive_snapshot_and_exit(driver, flutter_view_element, step_name="schedule_tile")
+    take_a_snapshot(driver, flutter_view_element, step_name="schedule_tile")
 
     # Minimize first graphic
     #click_canvas_at(driver, flutter_view_element, 1200, 645) # Original commented line, keeping it as is
     click_canvas_at(driver, flutter_view_element, 1200, 550)
     time.sleep(2)
-    interactive_snapshot_and_exit(driver, flutter_view_element, step_name="minimize_one")
+    take_a_snapshot(driver, flutter_view_element, step_name="minimize_one")
 
     # Minimize second graphic
     click_canvas_at(driver, flutter_view_element, 1200, 300)
     time.sleep(2)
-    interactive_snapshot_and_exit(driver, flutter_view_element, step_name="minimize_two")
+    take_a_snapshot(driver, flutter_view_element, step_name="minimize_two")
     time.sleep(2)
 
     # Scroll and snapshot pipeline
     print("Scrolling up to the top of the day of the month view...")
     scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=-120, steps=10, delay=0.2, x=1200, y=350)
-    interactive_snapshot_and_exit(driver, flutter_view_element, step_name="after_scroll_up")
+    take_a_snapshot(driver, flutter_view_element, step_name="after_scroll_up")
     time.sleep(2)
 
     print("Beginning snapshot and scroll loop...")
@@ -316,7 +318,8 @@ def snapshot_schedule_entries (driver):
                 wsdelta = 150
             else:
                 #wsdelta = 200 # Original commented line, keeping it as is
-                wsdelta = 100
+                #wsdelta = 100
+                wsdelta = 70
 
 
             #scroll_canvas_with_wheel(driver, flutter_view_element, delta_y=95, steps=1, delay=1, x=1200, y=350) # Original commented line, keeping it as is
@@ -340,10 +343,13 @@ def snapshot_schedule_entries (driver):
 
         # 3. Return to the DOM canvas using browser back
         print("Returning to DOM canvas...")
-        #driver.back()
-        driver.execute_script("window.history.go(-1)")
+        # driver.back()
+        # driver.execute_script("window.history.go(-1)")
+        print("calling click_canvas_at...")
+        click_canvas_at(driver, flutter_view_element, 492, 36 )
 
-        time.sleep(5)   # Give time for the view to update
+        print("sleeping for 3 ...")
+        time.sleep(3)   # Give time for the view to update
                          # if it ever expires again set it to 15
 
         # 4. Re-locate the canvas element after navigation
@@ -519,7 +525,7 @@ if __name__ == "__main__":
     structured_csv_path = OCR_FILEPATH # Using OCR_FILEPATH from config for consistency
 
     # handle login and hop to home depot dashboard
-    print("calling hand_thd_login()")
+    print("calling handle_thd_login()")
     handle_thd_login (driver)
 
     # traverse the schedule and take snapshots of schedule entires

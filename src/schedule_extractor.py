@@ -441,7 +441,7 @@ def get_calendar_id_gui():
         root = tk.Tk()
         root.withdraw() # Hide the main tkinter window
         print("DEBUG: Tkinter root created and hidden.")
-        calendar_id = simpledialog.askstring("Input", "Please enter the Google Calendar ID (e.g., 'primary'):",
+        calendar_id = simpledialog.askstring("Input", "Please enter the Google Calendar ID (e.g., 'login_id@gmail.com'):",
                                              parent=root)
         print(f"DEBUG: simpledialog.askstring returned: '{calendar_id}'")
         root.destroy() # Destroy the hidden root window after use
@@ -491,6 +491,7 @@ if __name__ == "__main__":
         # 2. If no command-line argument, prompt with GUI
         print("DEBUG: No calendar ID provided via command line. Attempting GUI prompt...")
         calendar_id = get_calendar_id_gui()
+        print(f"DEBUG: Calendar ID from GUI: '{calendar_id}'")
         if calendar_id is None: # User clicked Cancel or GUI failed
             print("DEBUG: Calendar ID GUI input cancelled or failed (returned None). Exiting.")
             sys.exit(1)
@@ -536,7 +537,7 @@ if __name__ == "__main__":
 
 
     # here is the call to create calendar entires
-    print(f"DEBUG: About to call create_calendar_events_from_results in calendar_builder.pywith no arguments'")
+    print(f"DEBUG: About to call create_calendar_events_from_results in calendar_builder.pywith arguments {calendar_id}")
     #create_calendar_events_from_results(calendar_id, structured_csv_path)
     create_calendar_events_from_results(calendar_id)
     print("DEBUG: create_calendar_events_from_results call completed.")

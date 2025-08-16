@@ -8,3 +8,10 @@ temp/
 *.log
 *.csv
 line
+*.bak
+*.out
+junk
+*.junk
+venv
+../*.junk
+

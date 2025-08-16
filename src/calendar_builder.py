@@ -98,27 +98,37 @@ def main(calendar_id=None):
         with open(TOKEN_FILE, 'w') as token:
             token.write(creds.to_json())
 
-    if len(sys.argv) > 1:
-        calendar_id = sys.argv[1]
-    elif calendar_id is None:
-        calendar_id = get_calendar_id_gui()
-        if not calendar_id:
-            print("Calendar ID input cancelled or empty. Exiting.")
-            sys.exit(1)
+    # Set a default calendar name for the script to use
+    calendar_name = 'work-schedule-cloud'
 
     try:
         service = build('calendar', 'v3', credentials=creds)
+
+        # Check if the calendar exists
+        calendar_list = service.calendarList().list().execute()
+        existing_calendar = None
+        for calendar_entry in calendar_list.get('items', []):
+            if calendar_entry.get('summary') == calendar_name:
+                existing_calendar = calendar_entry
+                break
+
+        if existing_calendar:
+            # If the calendar exists, use its ID
+            calendar_id = existing_calendar['id']
+            print(f"The script will update the calendar: '{calendar_name}' with ID '{calendar_id}'")
+        else:
+            # If the calendar doesn't exist, create it
+            print(f"Calendar '{calendar_name}' not found. Creating a new one...")
+            new_calendar_body = {
+                'summary': calendar_name,
+                'timeZone': 'America/Los_Angeles' 
+            }
+            new_calendar = service.calendars().insert(body=new_calendar_body).execute()
+            calendar_id = new_calendar['id']
+            print(f"Successfully created new calendar: '{calendar_name}' with ID '{calendar_id}'")
+            print(f"Using calendar time zone: America/Los_Angeles")
         
-        if not calendar_id:
-            print("Calendar ID cannot be empty. Exiting.")
-            return
-
-        calendar = service.calendars().get(calendarId=calendar_id).execute()
-        calendar_timezone = calendar.get('timeZone', 'America/New_York')
-        calendar_summary = calendar.get('summary', 'your calendar')
-
-        print(f"The script will update the calendar: '{calendar_summary}' with ID '{calendar_id}'")
-        print(f"Using calendar time zone: {calendar_timezone}")
+        calendar_timezone = 'America/Los_Angeles'
 
         ocr_csv_filepath = OCR_FILEPATH
         if not os.path.exists(ocr_csv_filepath):
@@ -222,4 +232,4 @@ def main(calendar_id=None):
         print(f"An unexpected error occurred: {e}")
 
 if __name__ == '__main__':
-    main(calendar_id=None)
+    main()
